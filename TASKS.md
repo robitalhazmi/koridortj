@@ -19,9 +19,9 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Manually verify row counts look sane against the feed's published route count
 
 ## Phase 2 — Historical fact data: transaction dataset
-- [ ] Download the public simulated tap-in/tap-out dataset
-- [ ] Write a loader that lands it into a raw Postgres table as-is (no transformation yet)
-- [ ] Document its provenance and synthetic nature in `/docs/data_sources.md`
+- [x] Download the public simulated tap-in/tap-out dataset
+- [x] Write a loader that lands it into a raw Postgres table as-is (no transformation yet)
+- [x] Document its provenance and synthetic nature in `/docs/data_sources.md`
 
 ## Phase 3 — Warehouse modeling with dbt
 - [ ] Initialize dbt project, connect to Postgres

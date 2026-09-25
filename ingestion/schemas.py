@@ -1,7 +1,7 @@
 """Pydantic schemas and validation models for KoridorTJ data ingestion."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -130,3 +130,64 @@ class GTFSCalendar(BaseModel):
         except ValueError:
             raise ValueError(f"Date string '{v}' must be in valid YYYYMMDD format")
         return v
+
+
+class RawTapTransaction(BaseModel):
+    """Pydantic model representing a raw simulated tap transaction record."""
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        populate_by_name=True,
+    )
+
+    trans_id: str = Field(..., alias="transID", description="Unique transaction ID")
+    pay_card_id: str = Field(..., alias="payCardID", description="Customer payment card identifier")
+    pay_card_bank: Optional[str] = Field(None, alias="payCardBank", description="Bank issuing payment card")
+    pay_card_name: Optional[str] = Field(None, alias="payCardName", description="Passenger name on card")
+    pay_card_sex: Optional[str] = Field(None, alias="payCardSex", description="Passenger gender (M/F)")
+    pay_card_birth_date: Optional[int] = Field(None, alias="payCardBirthDate", description="Birth year")
+    corridor_id: Optional[str] = Field(None, alias="corridorID", description="Corridor / Route identifier")
+    corridor_name: Optional[str] = Field(None, alias="corridorName", description="Corridor descriptive name")
+    direction: Optional[int] = Field(0, alias="direction", description="0 = Outbound, 1 = Inbound")
+    tap_in_stops: Optional[str] = Field(None, alias="tapInStops", description="Stop ID for tap-in")
+    tap_in_stops_name: Optional[str] = Field(None, alias="tapInStopsName", description="Stop name for tap-in")
+    tap_in_stops_lat: Optional[float] = Field(None, alias="tapInStopsLat", description="Tap-in latitude")
+    tap_in_stops_lon: Optional[float] = Field(None, alias="tapInStopsLon", description="Tap-in longitude")
+    stop_start_seq: Optional[int] = Field(None, alias="stopStartSeq", description="Start stop sequence index")
+    tap_in_time: Optional[datetime] = Field(None, alias="tapInTime", description="Timestamp of tap-in")
+    tap_out_stops: Optional[str] = Field(None, alias="tapOutStops", description="Stop ID for tap-out")
+    tap_out_stops_name: Optional[str] = Field(None, alias="tapOutStopsName", description="Stop name for tap-out")
+    tap_out_stops_lat: Optional[float] = Field(None, alias="tapOutStopsLat", description="Tap-out latitude")
+    tap_out_stops_lon: Optional[float] = Field(None, alias="tapOutStopsLon", description="Tap-out longitude")
+    stop_end_seq: Optional[int] = Field(None, alias="stopEndSeq", description="End stop sequence index")
+    tap_out_time: Optional[datetime] = Field(None, alias="tapOutTime", description="Timestamp of tap-out")
+    pay_amount: Optional[float] = Field(3500.0, alias="payAmount", description="Transaction fare amount in IDR")
+
+    @field_validator("trans_id", "pay_card_id")
+    @classmethod
+    def validate_required_ids(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Required identifier cannot be empty")
+        return v.strip()
+
+    @field_validator("direction", "stop_end_seq", mode="before")
+    @classmethod
+    def coerce_float_to_int(cls, v: Any) -> Optional[int]:
+        if v is None or v == "":
+            return None
+        try:
+            return int(float(v))
+        except (ValueError, TypeError):
+            return None
+
+    @field_validator("pay_card_birth_date", mode="before")
+    @classmethod
+    def coerce_birth_date(cls, v: Any) -> Optional[int]:
+        if v is None or v == "":
+            return None
+        try:
+            return int(float(v))
+        except (ValueError, TypeError):
+            return None
+

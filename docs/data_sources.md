@@ -38,7 +38,40 @@ Every row loaded into the `raw` schema is stamped with two audit columns:
 | Attribute | Specification |
 |---|---|
 | **Data Nature** | **Simulated / Synthetic** |
-| **Description** | Faker-generated timestamped tap-in and tap-out transaction events built upon the real TransJakarta stop/route structure. |
-| **Usage** | Demonstrates high-volume batch loading and real-time Kafka streaming replay patterns. |
-| **Labeling Standard** | Explicitly labeled as simulated across all models (`is_simulated = TRUE`), dashboards, and documentation. |
-| **Phase** | Phase 2 (Historical Batch Loader) & Phase 5 (Kafka Streaming Replay) |
+| **Original Publisher / Repository** | Public capstone dataset by `rahmadits/capstone2_transjakarta` (derived from Kaggle dataset by `dikirenanda`) |
+| **Source URL** | `https://raw.githubusercontent.com/rahmadits/capstone2_transjakarta/master/Transjakarta.csv` |
+| **Date Range Covered** | April 1, 2023 – April 30, 2023 |
+| **Verified Row Count** | **37,900 transactions** (2,000 unique passenger cards) |
+| **Landing Table** | `raw.taps` (PostgreSQL `warehouse` database) |
+| **Ingestion Pipeline** | `ingestion/tap_loader.py` |
+| **Labeling Standard** | Explicitly flagged as synthetic on every record (`is_simulated = TRUE`). |
+
+### Raw Schema: `raw.taps`
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `trans_id` | `VARCHAR(100)` | No (PK) | Unique transaction alphanumeric identifier |
+| `pay_card_id` | `VARCHAR(100)` | No | Customer payment card identifier |
+| `pay_card_bank` | `VARCHAR(100)` | Yes | Issuing card bank (e.g., `emoney`, `flazz`, `brizzi`, `dki`) |
+| `pay_card_name` | `VARCHAR(255)` | Yes | Passenger name embedded on payment card |
+| `pay_card_sex` | `VARCHAR(10)` | Yes | Passenger gender (`M`/`F`) |
+| `pay_card_birth_date` | `INT` | Yes | Passenger birth year |
+| `corridor_id` | `VARCHAR(100)` | Yes | Route / corridor ID |
+| `corridor_name` | `VARCHAR(255)` | Yes | Corridor descriptive name |
+| `direction` | `INT` | Yes | Direction flag (0 = Outbound, 1 = Inbound) |
+| `tap_in_stops` | `VARCHAR(100)` | Yes | Tap-in stop ID |
+| `tap_in_stops_name` | `VARCHAR(255)` | Yes | Tap-in stop name |
+| `tap_in_stops_lat` | `DOUBLE PRECISION` | Yes | Tap-in stop latitude coordinate |
+| `tap_in_stops_lon` | `DOUBLE PRECISION` | Yes | Tap-in stop longitude coordinate |
+| `stop_start_seq` | `INT` | Yes | Sequence number of tap-in stop |
+| `tap_in_time` | `TIMESTAMP` | Yes | Timestamp of tap-in |
+| `tap_out_stops` | `VARCHAR(100)` | Yes | Tap-out stop ID |
+| `tap_out_stops_name` | `VARCHAR(255)` | Yes | Tap-out stop name |
+| `tap_out_stops_lat` | `DOUBLE PRECISION` | Yes | Tap-out stop latitude coordinate |
+| `tap_out_stops_lon` | `DOUBLE PRECISION` | Yes | Tap-out stop longitude coordinate |
+| `stop_end_seq` | `INT` | Yes | Sequence number of tap-out stop |
+| `tap_out_time` | `TIMESTAMP` | Yes | Timestamp of tap-out |
+| `pay_amount` | `NUMERIC(10,2)` | Yes | Fare amount in IDR (standard Rp 3,500) |
+| `is_simulated` | `BOOLEAN` | No | Constant `TRUE` indicator for synthetic fact data |
+| `_ingested_at` | `TIMESTAMPTZ` | No | Ingestion timestamp |
+| `_source_file` | `TEXT` | Yes | Source filename reference |
