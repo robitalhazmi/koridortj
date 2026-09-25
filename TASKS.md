@@ -12,11 +12,11 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Confirm Antigravity IDE + Docker + Docker Compose work locally
 
 ## Phase 1 — Real reference data: GTFS ingestion
-- [ ] Write a Python script to download the current Transjakarta GTFS zip
-- [ ] Parse `routes.txt`, `stops.txt`, `trips.txt`, `calendar.txt` into raw Postgres tables
-- [ ] Handle: feed unreachable, zip malformed, schema changed since last run
-- [ ] Add basic logging (structured, not just `print`)
-- [ ] Manually verify row counts look sane against the feed's published route count
+- [x] Write a Python script to download the current Transjakarta GTFS zip
+- [x] Parse `routes.txt`, `stops.txt`, `trips.txt`, `calendar.txt` into raw Postgres tables
+- [x] Handle: feed unreachable, zip malformed, schema changed since last run
+- [x] Add basic logging (structured, not just `print`)
+- [x] Manually verify row counts look sane against the feed's published route count
 
 ## Phase 2 — Historical fact data: transaction dataset
 - [ ] Download the public simulated tap-in/tap-out dataset

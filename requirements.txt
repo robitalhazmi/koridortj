@@ -1,0 +1,6 @@
+# KoridorTJ Python Dependencies
+pydantic>=2.7.0
+psycopg2-binary>=2.9.9
+requests>=2.32.0
+python-dotenv>=1.0.1
+pytest>=8.2.0

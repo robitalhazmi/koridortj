@@ -1,2 +1,30 @@
-# Docker Compose configuration for KoridorTJ stack
-# Placeholder: will be configured in subsequent phases (Airflow, Kafka, Postgres, Superset, services)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: koridortj-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_WAREHOUSE:-warehouse}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB_WAREHOUSE:-warehouse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - koridortj-network
+
+volumes:
+  postgres_data:
+    name: koridortj_postgres_data
+
+networks:
+  koridortj-network:
+    name: koridortj-network
+    driver: bridge
