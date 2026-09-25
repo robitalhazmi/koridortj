@@ -16,3 +16,6 @@ sources:
         description: "Raw operational service calendars downloaded from TransJakarta official GTFS feed."
       - name: taps
         description: "Raw simulated passenger tap-in and tap-out transaction events."
+      - name: taps_stream
+        description: "Raw streaming passenger tap transaction events ingested from Kafka topic taps.raw."
+

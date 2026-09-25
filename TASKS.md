@@ -38,11 +38,12 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Confirm DAGs are idempotent (safe to re-run without duplicating data)
 
 ## Phase 5 — Streaming: replay pipeline
-- [ ] Stand up Kafka (KRaft mode, no ZooKeeper) via Docker Compose
-- [ ] Write the replay producer (reads historical taps, republishes with "now" timestamps at a configurable speed multiplier)
-- [ ] Write the consumer service (validates each event with Pydantic, lands good events in Postgres, bad events to a dead-letter topic)
-- [ ] Add a small incremental dbt model that picks up newly-landed streaming taps
-- [ ] Load test: run the producer for an hour, confirm no consumer lag/crash
+- [x] Stand up Kafka (KRaft mode, no ZooKeeper) via Docker Compose
+- [x] Write the replay producer (reads historical taps, republishes with "now" timestamps at a configurable speed multiplier)
+- [x] Write the consumer service (validates each event with Pydantic, lands good events in Postgres, bad events to a dead-letter topic)
+- [x] Add a small incremental dbt model that picks up newly-landed streaming taps
+- [x] Load test: run the producer for an hour, confirm no consumer lag/crash
+
 
 ## Phase 6 — Data quality & governance
 - [ ] Add dbt schema tests: `not_null`, `unique`, `relationships`, `accepted_values` on key columns

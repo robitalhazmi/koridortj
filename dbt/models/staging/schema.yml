@@ -81,3 +81,29 @@ models:
           - not_null
           - accepted_values:
               values: [true]
+
+  - name: stg_streaming_taps
+    description: "Staging view over real-time streaming tap events unpivoted into discrete IN and OUT tap records."
+    columns:
+      - name: tap_id
+        description: "Unique streaming tap event primary key (trans_id + '_IN' or '_OUT')."
+        tests:
+          - not_null
+          - unique
+      - name: trans_id
+        description: "Transaction ID identifier."
+        tests:
+          - not_null
+      - name: tap_type
+        description: "Tap direction ('IN' or 'OUT')."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['IN', 'OUT']
+      - name: is_simulated
+        description: "Boolean flag identifying synthetic data."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true]
+

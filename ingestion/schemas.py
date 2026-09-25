@@ -191,3 +191,22 @@ class RawTapTransaction(BaseModel):
         except (ValueError, TypeError):
             return None
 
+
+class StreamingTapEvent(RawTapTransaction):
+    """Pydantic model for validating real-time streaming tap transactions over Kafka."""
+
+    is_simulated: bool = Field(True, description="Always TRUE for simulated replay data")
+
+
+class DeadLetterEvent(BaseModel):
+    """Pydantic model for messages routed to Kafka Dead-Letter Queue (taps.deadletter)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    original_payload: Any = Field(..., description="The raw unparseable or invalid payload")
+    error_message: str = Field(..., description="Detailed validation or processing error")
+    error_type: str = Field(..., description="Class or category of error (e.g. ValidationError, JSONDecodeError)")
+    failed_at: str = Field(..., description="ISO 8601 UTC timestamp of failure")
+    source_topic: str = Field("taps.raw", description="Original topic where error occurred")
+
+
