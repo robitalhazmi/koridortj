@@ -1,5 +1,25 @@
-# dbt project configuration for KoridorTJ
-# Placeholder: will be configured in Phase 3
 name: 'koridortj'
 version: '1.0.0'
 config-version: 2
+
+profile: 'koridortj'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  koridortj:
+    staging:
+      +materialized: view
+      +schema: staging
+    warehouse:
+      +materialized: table
+      +schema: warehouse

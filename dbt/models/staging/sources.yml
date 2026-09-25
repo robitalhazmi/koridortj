@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: raw
+    database: warehouse
+    schema: raw
+    description: "Raw landing zone tables for TransJakarta GTFS and simulated tap transactions."
+    tables:
+      - name: gtfs_routes
+        description: "Raw routes downloaded from TransJakarta official GTFS feed."
+      - name: gtfs_stops
+        description: "Raw stops and shelters downloaded from TransJakarta official GTFS feed."
+      - name: gtfs_trips
+        description: "Raw trip patterns downloaded from TransJakarta official GTFS feed."
+      - name: gtfs_calendar
+        description: "Raw operational service calendars downloaded from TransJakarta official GTFS feed."
+      - name: taps
+        description: "Raw simulated passenger tap-in and tap-out transaction events."

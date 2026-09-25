@@ -24,11 +24,11 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Document its provenance and synthetic nature in `/docs/data_sources.md`
 
 ## Phase 3 — Warehouse modeling with dbt
-- [ ] Initialize dbt project, connect to Postgres
-- [ ] Build staging models (`stg_routes`, `stg_stops`, `stg_trips`, `stg_taps`, ...)
-- [ ] Build dimension models: `dim_routes`, `dim_stops`, `dim_corridors`, `dim_calendar`
-- [ ] Build fact model: `fact_taps`
-- [ ] Add column-level descriptions in `schema.yml` for every model
+- [x] Initialize dbt project, connect to Postgres
+- [x] Build staging models (`stg_routes`, `stg_stops`, `stg_trips`, `stg_taps`, `stg_calendar`)
+- [x] Build dimension models: `dim_routes`, `dim_stops`, `dim_corridors`, `dim_calendar`
+- [x] Build fact model: `fact_taps`
+- [x] Add column-level descriptions in `schema.yml` for every model
 
 ## Phase 4 — Orchestration with Airflow
 - [ ] Stand up Airflow (LocalExecutor) via Docker Compose

@@ -65,6 +65,7 @@ dbt/target/
 dbt/dbt_packages/
 dbt/logs/
 dbt/dbt_modules/
+dbt/.user.yml
 target/
 dbt_packages/
 logs/

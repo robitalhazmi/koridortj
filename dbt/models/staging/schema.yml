@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: stg_routes
+    description: "Staging view over official TransJakarta GTFS routes with trimmed fields and standard typing."
+    columns:
+      - name: route_id
+        description: "Primary key identifier for the route."
+        tests:
+          - not_null
+          - unique
+      - name: route_type
+        description: "GTFS route type integer code."
+        tests:
+          - not_null
+
+  - name: stg_stops
+    description: "Staging view over official TransJakarta GTFS stops and stations with geographic coordinates."
+    columns:
+      - name: stop_id
+        description: "Primary key identifier for the stop/shelter."
+        tests:
+          - not_null
+          - unique
+      - name: stop_name
+        description: "Public name of the transit stop."
+        tests:
+          - not_null
+      - name: latitude
+        description: "Latitude coordinate of the stop."
+        tests:
+          - not_null
+      - name: longitude
+        description: "Longitude coordinate of the stop."
+        tests:
+          - not_null
+
+  - name: stg_trips
+    description: "Staging view over official TransJakarta GTFS directional trip shapes and headsigns."
+    columns:
+      - name: trip_id
+        description: "Primary key identifier for the trip."
+        tests:
+          - not_null
+          - unique
+      - name: route_id
+        description: "Foreign key reference to stg_routes."
+        tests:
+          - not_null
+
+  - name: stg_calendar
+    description: "Staging view over official TransJakarta GTFS operational schedule calendars."
+    columns:
+      - name: service_id
+        description: "Primary key identifier for the service calendar."
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_taps
+    description: "Staging view over passenger tap events unpivoted into discrete IN and OUT tap records."
+    columns:
+      - name: tap_id
+        description: "Unique tap event primary key (trans_id + '_IN' or '_OUT')."
+        tests:
+          - not_null
+          - unique
+      - name: trans_id
+        description: "Transaction ID identifier."
+        tests:
+          - not_null
+      - name: tap_type
+        description: "Tap direction ('IN' or 'OUT')."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['IN', 'OUT']
+      - name: is_simulated
+        description: "Boolean flag identifying synthetic data."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true]

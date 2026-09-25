@@ -1,0 +1,14 @@
+koridortj:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      user: "{{ env_var('POSTGRES_INGESTION_USER', 'ingestion_user') }}"
+      password: "{{ env_var('POSTGRES_INGESTION_PASSWORD', 'ingestion_dev_password') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      dbname: "{{ env_var('POSTGRES_DB_WAREHOUSE', 'warehouse') }}"
+      schema: public
+      threads: 4
+      keepalives_idle: 0
+      connect_timeout: 10

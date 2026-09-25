@@ -1,0 +1,117 @@
+version: 2
+
+models:
+  - name: dim_routes
+    description: "Conformed dimension table representing TransJakarta routes, corridors, and services."
+    columns:
+      - name: route_id
+        description: "Primary key identifier for the route or corridor."
+        tests:
+          - not_null
+          - unique
+      - name: route_name
+        description: "Full descriptive name of the route."
+        tests:
+          - not_null
+      - name: route_type
+        description: "Route classification code (3 = Bus/BRT)."
+        tests:
+          - not_null
+
+  - name: dim_stops
+    description: "Conformed dimension table representing TransJakarta bus stops, shelters, and stations with coordinates."
+    columns:
+      - name: stop_id
+        description: "Primary key identifier for the stop/shelter."
+        tests:
+          - not_null
+          - unique
+      - name: stop_name
+        description: "Public name of the transit stop."
+        tests:
+          - not_null
+      - name: latitude
+        description: "Latitude GPS coordinate."
+        tests:
+          - not_null
+      - name: longitude
+        description: "Longitude GPS coordinate."
+        tests:
+          - not_null
+
+  - name: dim_corridors
+    description: "Conformed dimension table for BRT corridors and directional branches."
+    columns:
+      - name: corridor_code
+        description: "Primary key code for the corridor."
+        tests:
+          - not_null
+          - unique
+      - name: corridor_name
+        description: "Descriptive name of the corridor."
+        tests:
+          - not_null
+
+  - name: dim_calendar
+    description: "Date dimension table covering transit operational dates with calendar attributes."
+    columns:
+      - name: date_id
+        description: "Integer surrogate primary key in YYYYMMDD format."
+        tests:
+          - not_null
+          - unique
+      - name: full_date
+        description: "Date value."
+        tests:
+          - not_null
+          - unique
+      - name: is_weekend
+        description: "Boolean flag for Saturday and Sunday."
+        tests:
+          - not_null
+
+  - name: fact_taps
+    description: "Star schema fact table containing individual passenger tap-in and tap-out events."
+    columns:
+      - name: tap_id
+        description: "Unique surrogate key for each tap event."
+        tests:
+          - not_null
+          - unique
+      - name: trans_id
+        description: "Transaction ID identifier."
+        tests:
+          - not_null
+      - name: route_id
+        description: "Foreign key reference to dim_routes."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_routes')
+              field: route_id
+      - name: stop_id
+        description: "Foreign key reference to dim_stops."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_stops')
+              field: stop_id
+      - name: date_id
+        description: "Foreign key reference to dim_calendar."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_calendar')
+              field: date_id
+      - name: tap_type
+        description: "Event type flag ('IN' or 'OUT')."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['IN', 'OUT']
+      - name: is_simulated
+        description: "Explicit constant boolean flag confirming synthetic fact data."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true]
