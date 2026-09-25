@@ -1,13 +1,102 @@
-# GitHub Actions CD Workflow for KoridorTJ
-# Placeholder: will be configured in Phase 9 (build Docker images, push to GHCR, trigger Coolify deploy)
-name: CD
+name: CD Pipeline
+
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  cd-placeholder:
+  build-and-push-images:
+    name: Build & Push GHCR Container Images
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder Step
-        run: echo "CD pipeline to be implemented in Phase 9"
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Downcase Repository Owner for Docker Tag
+        id: repo_meta
+        run: |
+          echo "owner_lc=${OWNER,,}" >> "${GITHUB_OUTPUT}"
+        env:
+          OWNER: '${{ github.repository_owner }}'
+
+      # 1. Token Service / Web Portal Image
+      - name: Build and Push Token Service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/guest_token_service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-token-service:latest
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-token-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 2. Replay Producer Image
+      - name: Build and Push Replay Producer
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.producer
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-replay-producer:latest
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-replay-producer:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 3. Tap Consumer Image
+      - name: Build and Push Tap Consumer
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.consumer
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-tap-consumer:latest
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-tap-consumer:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-coolify:
+    name: Trigger Coolify Zero-Downtime Deployment
+    runs-on: ubuntu-latest
+    needs: [build-and-push-images]
+    steps:
+      - name: Trigger Webhook Redeploy
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+        run: |
+          if [ -n "$COOLIFY_WEBHOOK_URL" ]; then
+            echo "Coolify webhook URL detected. Triggering automated deployment..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$COOLIFY_WEBHOOK_URL")
+            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            echo "Deployment webhook response status: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "Deployment triggered successfully on Coolify VPS!"
+            else
+              echo "Warning: Coolify webhook returned status $HTTP_CODE"
+            fi
+          else
+            echo "COOLIFY_WEBHOOK_URL secret not configured in repository."
+            echo "To enable automated CD redeploys, add COOLIFY_WEBHOOK_URL to GitHub Secrets."
+          fi

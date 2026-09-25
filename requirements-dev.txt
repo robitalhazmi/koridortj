@@ -1,0 +1,11 @@
+# Development & CI Dependencies
+-r requirements.txt
+ruff>=0.4.0
+pytest>=8.2.0
+httpx>=0.27.0
+sqlfluff>=3.0.0
+sqlfluff-templater-dbt>=3.0.0
+fastapi>=0.111.0
+uvicorn>=0.29.0
+pyjwt>=2.8.0
+kafka-python-ng>=2.2.2

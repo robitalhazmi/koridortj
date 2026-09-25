@@ -1,13 +1,118 @@
-# GitHub Actions CI Workflow for KoridorTJ
-# Placeholder: will be configured in Phase 9 (lint, pytest, dbt test against postgres)
-name: CI
+name: CI Pipeline
+
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci-placeholder:
+  lint:
+    name: Code Quality & Linting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder Step
-        run: echo "CI pipeline to be implemented in Phase 9"
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Linting Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff Linter
+        run: ruff check .
+
+      - name: Run Ruff Formatter Check
+        run: ruff format --check .
+
+  test-python:
+    name: Unit & Schema Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Pytest Suite
+        run: pytest -v tests/
+
+  test-dbt:
+    name: Ephemeral Warehouse & dbt Tests
+    runs-on: ubuntu-latest
+    needs: [lint, test-python]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_dev_password
+          POSTGRES_DB: warehouse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Pipeline Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Bootstrap Ephemeral Database
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_dev_password
+          POSTGRES_DB_WAREHOUSE: warehouse
+        run: python scripts/prepare_ci_db.py
+
+      - name: Execute dbt Transform Models
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_INGESTION_USER: ingestion_user
+          POSTGRES_INGESTION_PASSWORD: ingestion_dev_password
+          POSTGRES_DB_WAREHOUSE: warehouse
+        run: dbt run --project-dir dbt --profiles-dir dbt
+
+      - name: Execute dbt Data Quality Tests (80 Tests)
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_INGESTION_USER: ingestion_user
+          POSTGRES_INGESTION_PASSWORD: ingestion_dev_password
+          POSTGRES_DB_WAREHOUSE: warehouse
+        run: dbt test --project-dir dbt --profiles-dir dbt

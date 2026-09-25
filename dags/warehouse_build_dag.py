@@ -5,6 +5,7 @@ enforces automated data quality assertions (dbt test), and updates documentation
 """
 
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
@@ -30,7 +31,6 @@ with DAG(
     max_active_runs=1,
     tags=["transjakarta", "dbt", "warehouse", "star_schema", "data_quality"],
 ) as dag:
-
     task_dbt_debug = BashOperator(
         task_id="dbt_debug_connection",
         bash_command=f"dbt parse --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROFILES_DIR}",
@@ -56,4 +56,10 @@ with DAG(
         bash_command=f"dbt docs generate --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROFILES_DIR}",
     )
 
-    task_dbt_debug >> task_dbt_run_staging >> task_dbt_run_warehouse >> task_dbt_test >> task_dbt_docs
+    (
+        task_dbt_debug
+        >> task_dbt_run_staging
+        >> task_dbt_run_warehouse
+        >> task_dbt_test
+        >> task_dbt_docs
+    )

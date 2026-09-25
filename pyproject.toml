@@ -1,0 +1,42 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+]
+ignore = [
+    "E501", # Line too long (managed by formatter)
+    "B008", # Do not perform function call in argument defaults (FastAPI Depends/Query pattern)
+    "B904", # Within an except clause, raise exceptions with from
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ingestion", "services", "dags"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.sqlfluff.core]
+dialect = "postgres"
+templater = "dbt"
+max_line_length = 120
+exclude_rules = "L031,L034"
+
+[tool.sqlfluff.templater.dbt]
+project_dir = "./dbt"
+profiles_dir = "./dbt"

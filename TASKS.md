@@ -68,17 +68,17 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Document VPS resource usage (RAM/CPU) — right-size the compose file if the VPS is small
 
 ## Phase 9 — CI/CD
-- [ ] GitHub Actions: lint job (ruff/black for Python, sqlfluff for SQL)
-- [ ] GitHub Actions: test job (pytest for ingestion/validation code, `dbt test` against an ephemeral Postgres service container)
-- [ ] GitHub Actions: build job (build & push Docker images to GHCR)
-- [ ] GitHub Actions: deploy job (call Coolify's API / `coolify-deploy-action` with `COOLIFY_API_TOKEN` to trigger a redeploy, gated behind the CI jobs passing)
-- [ ] Add a status badge to the README
+- [x] GitHub Actions: lint job (ruff/black for Python, sqlfluff for SQL)
+- [x] GitHub Actions: test job (pytest for ingestion/validation code, `dbt test` against an ephemeral Postgres service container)
+- [x] GitHub Actions: build job (build & push Docker images to GHCR)
+- [x] GitHub Actions: deploy job (call Coolify's API / `coolify-deploy-action` with `COOLIFY_API_TOKEN` to trigger a redeploy, gated behind the CI jobs passing)
+- [x] Add a status badge to the README
 
 ## Phase 10 — Documentation & polish
-- [ ] Finish `README.md`: architecture diagram, quick start, links to dbt docs + public dashboard
-- [ ] Record a short screen-capture GIF/video of the dashboard and DAGs for the README
-- [ ] Proofread all docs for the "simulated data" disclaimer consistency
-- [ ] Tag a `v1.0` release on GitHub
+- [x] Finish `README.md`: architecture diagram, quick start, links to dbt docs + public dashboard
+- [x] Record a short screen-capture GIF/video of the dashboard and DAGs for the README
+- [x] Proofread all docs for the "simulated data" disclaimer consistency
+- [x] Tag a `v1.0` release on GitHub
 
 ---
 

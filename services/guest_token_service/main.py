@@ -6,17 +6,16 @@ serves live transit KPIs from the PostgreSQL warehouse, and hosts the public web
 
 import os
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import psycopg2
 import psycopg2.extras
-from fastapi import FastAPI, HTTPException, Query
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -45,7 +44,9 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_READONLY_PASSWORD", "superset_ro_dev_pas
 
 SUPERSET_DOMAIN = os.getenv("SUPERSET_DOMAIN", "http://localhost:8088")
 SUPERSET_DASHBOARD_ID = os.getenv("SUPERSET_DASHBOARD_ID", "45d44fda-4e9c-4a88-894d-819f66fbfd33")
-SUPERSET_JWT_SECRET = os.getenv("SUPERSET_GUEST_TOKEN_JWT_SECRET", "koridortj_guest_token_jwt_secret_abcdef123456")
+SUPERSET_JWT_SECRET = os.getenv(
+    "SUPERSET_GUEST_TOKEN_JWT_SECRET", "koridortj_guest_token_jwt_secret_abcdef123456"
+)
 
 SUPERSET_JWT_ALGO = "HS256"
 SUPERSET_JWT_EXP_SECONDS = 3600
@@ -90,16 +91,16 @@ def health_check():
         "status": "healthy" if db_status == "healthy" else "degraded",
         "uptime_seconds": round(time.time() - START_TIME, 1),
         "database": db_status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "disclaimer": "All passenger tap transactions are simulated data for demonstration purposes.",
     }
 
 
 @app.get("/api/guest-token", response_model=GuestTokenResponse, tags=["Security"])
-def mint_guest_token(dashboard_id: Optional[str] = None):
+def mint_guest_token(dashboard_id: str | None = None):
     """Mints a short-lived signed JWT guest token for Superset embedded dashboard."""
     target_dashboard = dashboard_id or SUPERSET_DASHBOARD_ID
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(seconds=SUPERSET_JWT_EXP_SECONDS)
 
     payload = {
@@ -214,5 +215,6 @@ if os.path.exists(web_dir):
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

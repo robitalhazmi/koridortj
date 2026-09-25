@@ -1,11 +1,10 @@
 """Unit tests for Kafka streaming components, replay producer, and consumer schemas."""
 
-import json
-from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
-from ingestion.schemas import DeadLetterEvent, StreamingTapEvent
+
 from ingestion.replay_producer import format_timestamp, parse_timestamp
+from ingestion.schemas import DeadLetterEvent, StreamingTapEvent
 
 
 class TestStreamingSchemas:

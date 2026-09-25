@@ -1,12 +1,12 @@
 """Unit tests for the Guest Token and Transit Telemetry FastAPI service."""
 
 import jwt
-import pytest
 from fastapi.testclient import TestClient
+
 from services.guest_token_service.main import (
-    app,
-    SUPERSET_JWT_SECRET,
     SUPERSET_JWT_ALGO,
+    SUPERSET_JWT_SECRET,
+    app,
 )
 
 client = TestClient(app)

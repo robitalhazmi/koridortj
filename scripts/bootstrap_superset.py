@@ -11,7 +11,8 @@ import logging
 import os
 import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import requests
 from dotenv import load_dotenv
 
@@ -37,13 +38,18 @@ WAREHOUSE_DB_URI = os.getenv(
 class SupersetProvisioner:
     """Manages Superset API automation."""
 
-    def __init__(self, base_url: str = SUPERSET_URL, username: str = SUPERSET_USER, password: str = SUPERSET_PASS):
+    def __init__(
+        self,
+        base_url: str = SUPERSET_URL,
+        username: str = SUPERSET_USER,
+        password: str = SUPERSET_PASS,
+    ):
         self.base_url = base_url.rstrip("/")
         self.username = username
         self.password = password
         self.session = requests.Session()
-        self.access_token: Optional[str] = None
-        self.csrf_token: Optional[str] = None
+        self.access_token: str | None = None
+        self.csrf_token: str | None = None
 
     def wait_for_superset(self, timeout_seconds: int = 180) -> bool:
         """Wait until Superset web server is responding."""
@@ -89,7 +95,7 @@ class SupersetProvisioner:
             return True
         return True
 
-    def create_database_connection(self) -> Optional[int]:
+    def create_database_connection(self) -> int | None:
         """Create or find the PostgreSQL warehouse connection."""
         url = f"{self.base_url}/api/v1/database/"
         res = self.session.get(url, timeout=10)
@@ -118,14 +124,21 @@ class SupersetProvisioner:
             logger.warning("Database registration response: %s", create_res.text)
             return None
 
-    def create_dataset(self, db_id: int, schema: str, table_name: str) -> Optional[int]:
+    def create_dataset(self, db_id: int, schema: str, table_name: str) -> int | None:
         """Register a table as a Superset dataset."""
         url = f"{self.base_url}/api/v1/dataset/"
-        res = self.session.get(f"{url}?q=(filters:[{{col:table_name,opr:eq,value:'{table_name}'}}])", timeout=10)
+        res = self.session.get(
+            f"{url}?q=(filters:[{{col:table_name,opr:eq,value:'{table_name}'}}])", timeout=10
+        )
         if res.status_code == 200:
             results = res.json().get("result", [])
             if results:
-                logger.info("Found existing dataset '%s.%s' (ID: %s)", schema, table_name, results[0].get("id"))
+                logger.info(
+                    "Found existing dataset '%s.%s' (ID: %s)",
+                    schema,
+                    table_name,
+                    results[0].get("id"),
+                )
                 return results[0].get("id")
 
         payload = {
@@ -136,16 +149,24 @@ class SupersetProvisioner:
         create_res = self.session.post(url, json=payload, timeout=10)
         if create_res.status_code in (200, 201):
             ds_id = create_res.json().get("id")
-            logger.info("Dataset '%s.%s' registered successfully with ID %s", schema, table_name, ds_id)
+            logger.info(
+                "Dataset '%s.%s' registered successfully with ID %s", schema, table_name, ds_id
+            )
             return ds_id
         else:
-            logger.warning("Dataset registration response for '%s.%s': %s", schema, table_name, create_res.text)
+            logger.warning(
+                "Dataset registration response for '%s.%s': %s", schema, table_name, create_res.text
+            )
             return None
 
-    def create_chart(self, dataset_id: int, slice_name: str, viz_type: str, params: Dict[str, Any]) -> Optional[int]:
+    def create_chart(
+        self, dataset_id: int, slice_name: str, viz_type: str, params: dict[str, Any]
+    ) -> int | None:
         """Create an analytical chart in Superset."""
         url = f"{self.base_url}/api/v1/chart/"
-        res = self.session.get(f"{url}?q=(filters:[{{col:slice_name,opr:eq,value:'{slice_name}'}}])", timeout=10)
+        res = self.session.get(
+            f"{url}?q=(filters:[{{col:slice_name,opr:eq,value:'{slice_name}'}}])", timeout=10
+        )
         if res.status_code == 200:
             results = res.json().get("result", [])
             if results:
@@ -168,19 +189,27 @@ class SupersetProvisioner:
             logger.warning("Chart creation failed for '%s': %s", slice_name, create_res.text)
             return None
 
-    def create_dashboard(self, dashboard_title: str, chart_ids: List[int]) -> Optional[Dict[str, Any]]:
+    def create_dashboard(self, dashboard_title: str, chart_ids: list[int]) -> dict[str, Any] | None:
         """Create or update a Superset dashboard and configure embedded access."""
         url = f"{self.base_url}/api/v1/dashboard/"
-        dash_id: Optional[int] = None
-        dash_uuid: Optional[str] = None
+        dash_id: int | None = None
+        dash_uuid: str | None = None
 
-        res = self.session.get(f"{url}?q=(filters:[{{col:dashboard_title,opr:eq,value:'{dashboard_title}'}}])", timeout=10)
+        res = self.session.get(
+            f"{url}?q=(filters:[{{col:dashboard_title,opr:eq,value:'{dashboard_title}'}}])",
+            timeout=10,
+        )
         if res.status_code == 200:
             results = res.json().get("result", [])
             if results:
                 dash_id = results[0].get("id")
                 dash_uuid = results[0].get("uuid")
-                logger.info("Found existing dashboard '%s' (ID: %s, UUID: %s)", dashboard_title, dash_id, dash_uuid)
+                logger.info(
+                    "Found existing dashboard '%s' (ID: %s, UUID: %s)",
+                    dashboard_title,
+                    dash_id,
+                    dash_uuid,
+                )
 
         if not dash_id:
             payload = {
@@ -195,7 +224,9 @@ class SupersetProvisioner:
                 d_res = self.session.get(f"{url}{dash_id}", timeout=10)
                 if d_res.status_code == 200:
                     dash_uuid = d_res.json().get("result", {}).get("uuid")
-                logger.info("Created dashboard '%s' (ID: %s, UUID: %s)", dashboard_title, dash_id, dash_uuid)
+                logger.info(
+                    "Created dashboard '%s' (ID: %s, UUID: %s)", dashboard_title, dash_id, dash_uuid
+                )
             else:
                 logger.warning("Failed to create dashboard: %s", create_res.text)
                 return None
@@ -203,16 +234,20 @@ class SupersetProvisioner:
         # Enable embedded dashboard
         embed_url = f"{self.base_url}/api/v1/dashboard/{dash_id}/embedded"
         embed_res = self.session.get(embed_url, timeout=10)
-        embedded_uuid: Optional[str] = None
+        embedded_uuid: str | None = None
 
         if embed_res.status_code == 200:
             embedded_uuid = embed_res.json().get("result", {}).get("uuid")
-            logger.info("Existing embedded dashboard configuration found (Embedded UUID: %s)", embedded_uuid)
+            logger.info(
+                "Existing embedded dashboard configuration found (Embedded UUID: %s)", embedded_uuid
+            )
         else:
             post_embed = self.session.post(embed_url, json={"allowed_domains": ["*"]}, timeout=10)
             if post_embed.status_code in (200, 201):
                 embedded_uuid = post_embed.json().get("result", {}).get("uuid")
-                logger.info("Embedded dashboard enabled successfully (Embedded UUID: %s)", embedded_uuid)
+                logger.info(
+                    "Embedded dashboard enabled successfully (Embedded UUID: %s)", embedded_uuid
+                )
 
         return {
             "dashboard_id": dash_id,
@@ -247,10 +282,17 @@ class SupersetProvisioner:
                 {
                     "metrics": ["count"],
                     "groupby": ["tap_type"],
-                    "adhoc_filters": [{"clause": "WHERE", "expressionType": "SQL", "sqlExpression": "tap_type = 'IN'"}],
+                    "adhoc_filters": [
+                        {
+                            "clause": "WHERE",
+                            "expressionType": "SQL",
+                            "sqlExpression": "tap_type = 'IN'",
+                        }
+                    ],
                 },
             )
-            if c1: chart_ids.append(c1)
+            if c1:
+                chart_ids.append(c1)
 
             # 2. Card Bank Market Share
             c2 = self.create_chart(
@@ -262,7 +304,8 @@ class SupersetProvisioner:
                     "groupby": ["pay_card_bank"],
                 },
             )
-            if c2: chart_ids.append(c2)
+            if c2:
+                chart_ids.append(c2)
 
             # 3. Top Boarding Stops
             c3 = self.create_chart(
@@ -276,7 +319,8 @@ class SupersetProvisioner:
                     "row_limit": 10,
                 },
             )
-            if c3: chart_ids.append(c3)
+            if c3:
+                chart_ids.append(c3)
 
             # 4. Weekday vs Weekend Pattern
             c4 = self.create_chart(
@@ -289,7 +333,8 @@ class SupersetProvisioner:
                     "row_limit": 15,
                 },
             )
-            if c4: chart_ids.append(c4)
+            if c4:
+                chart_ids.append(c4)
 
         # Create Dashboard
         dash_info = self.create_dashboard("TransJakarta Transit Intelligence Overview", chart_ids)

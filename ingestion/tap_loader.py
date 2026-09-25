@@ -11,13 +11,14 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import psycopg2
-from psycopg2.extras import execute_values
-from pydantic import ValidationError
 import requests
 from dotenv import load_dotenv
+from psycopg2.extras import execute_values
+from pydantic import ValidationError
 
 # Load environment variables
 load_dotenv()
@@ -37,12 +38,17 @@ except ImportError:
     from schemas import RawTapTransaction
 
 
-DEFAULT_TAP_URL = "https://raw.githubusercontent.com/rahmadits/capstone2_transjakarta/master/Transjakarta.csv"
-DEFAULT_CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "transjakarta_taps.csv")
+DEFAULT_TAP_URL = (
+    "https://raw.githubusercontent.com/rahmadits/capstone2_transjakarta/master/Transjakarta.csv"
+)
+DEFAULT_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "transjakarta_taps.csv"
+)
 
 
 class TapLoaderError(Exception):
     """Base exception for tap loading errors."""
+
     pass
 
 
@@ -51,25 +57,37 @@ class TapLoader:
 
     def __init__(
         self,
-        db_host: Optional[str] = None,
-        db_port: Optional[int] = None,
-        db_name: Optional[str] = None,
-        db_user: Optional[str] = None,
-        db_password: Optional[str] = None,
-        dataset_url: Optional[str] = None,
-        cache_path: Optional[str] = None,
+        db_host: str | None = None,
+        db_port: int | None = None,
+        db_name: str | None = None,
+        db_user: str | None = None,
+        db_password: str | None = None,
+        dataset_url: str | None = None,
+        cache_path: str | None = None,
     ):
         self.db_host = db_host or os.getenv("POSTGRES_HOST", "localhost")
         self.db_port = int(db_port or os.getenv("POSTGRES_PORT", 5432))
-        self.db_name = db_name or os.getenv("POSTGRES_DB_WAREHOUSE", os.getenv("POSTGRES_DB", "warehouse"))
-        self.db_user = db_user or os.getenv("POSTGRES_INGESTION_USER", os.getenv("POSTGRES_USER", "postgres"))
-        self.db_password = db_password or os.getenv("POSTGRES_INGESTION_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres_dev_password"))
+        self.db_name = db_name or os.getenv(
+            "POSTGRES_DB_WAREHOUSE", os.getenv("POSTGRES_DB", "warehouse")
+        )
+        self.db_user = db_user or os.getenv(
+            "POSTGRES_INGESTION_USER", os.getenv("POSTGRES_USER", "postgres")
+        )
+        self.db_password = db_password or os.getenv(
+            "POSTGRES_INGESTION_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres_dev_password")
+        )
         self.dataset_url = dataset_url or os.getenv("TAP_DATASET_URL", DEFAULT_TAP_URL)
         self.cache_path = cache_path or os.getenv("TAP_CACHE_PATH", DEFAULT_CACHE_PATH)
 
     def get_connection(self) -> psycopg2.extensions.connection:
         """Establish connection to the target PostgreSQL database."""
-        logger.info("Connecting to PostgreSQL at %s:%s/%s as %s", self.db_host, self.db_port, self.db_name, self.db_user)
+        logger.info(
+            "Connecting to PostgreSQL at %s:%s/%s as %s",
+            self.db_host,
+            self.db_port,
+            self.db_name,
+            self.db_user,
+        )
         try:
             conn = psycopg2.connect(
                 host=self.db_host,
@@ -88,21 +106,34 @@ class TapLoader:
     def ensure_dataset_available(self) -> str:
         """Download and cache the dataset CSV if not already present."""
         if os.path.exists(self.cache_path) and os.path.getsize(self.cache_path) > 0:
-            logger.info("Found cached dataset at %s (%d bytes)", self.cache_path, os.path.getsize(self.cache_path))
+            logger.info(
+                "Found cached dataset at %s (%d bytes)",
+                self.cache_path,
+                os.path.getsize(self.cache_path),
+            )
             return self.cache_path
 
         os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
         logger.info("Downloading historical simulated tap dataset from %s", self.dataset_url)
 
         try:
-            response = requests.get(self.dataset_url, stream=True, timeout=60, headers={"User-Agent": "KoridorTJ-Loader/1.0"})
+            response = requests.get(
+                self.dataset_url,
+                stream=True,
+                timeout=60,
+                headers={"User-Agent": "KoridorTJ-Loader/1.0"},
+            )
             response.raise_for_status()
             with open(self.cache_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=65536):
                     if chunk:
                         f.write(chunk)
 
-            logger.info("Dataset successfully downloaded and cached to %s (%d bytes)", self.cache_path, os.path.getsize(self.cache_path))
+            logger.info(
+                "Dataset successfully downloaded and cached to %s (%d bytes)",
+                self.cache_path,
+                os.path.getsize(self.cache_path),
+            )
             return self.cache_path
         except Exception as exc:
             logger.error("Failed to download dataset: %s", exc)
@@ -146,15 +177,19 @@ class TapLoader:
             """)
             # Create indexes for commonly filtered attributes
             cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_taps_card ON raw.taps (pay_card_id);")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_taps_corridor ON raw.taps (corridor_id);")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_taps_tap_in_time ON raw.taps (tap_in_time);")
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_raw_taps_corridor ON raw.taps (corridor_id);"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_raw_taps_tap_in_time ON raw.taps (tap_in_time);"
+            )
             conn.commit()
 
     def load_records_batch(
         self,
         conn: psycopg2.extensions.connection,
-        records: List[Dict[str, Any]],
-        columns: List[str],
+        records: list[dict[str, Any]],
+        columns: list[str],
         ingested_at: datetime,
         source_file: str,
     ) -> int:
@@ -164,15 +199,14 @@ class TapLoader:
 
         full_columns = columns + ["is_simulated", "_ingested_at", "_source_file"]
         rows_to_insert = [
-            tuple(r.get(c) for c in columns) + (True, ingested_at, source_file)
-            for r in records
+            tuple(r.get(c) for c in columns) + (True, ingested_at, source_file) for r in records
         ]
 
         query = f"""
-            INSERT INTO raw.taps ({', '.join(full_columns)})
+            INSERT INTO raw.taps ({", ".join(full_columns)})
             VALUES %s
             ON CONFLICT (trans_id) DO UPDATE SET
-                {', '.join(f"{c} = EXCLUDED.{c}" for c in columns[1:])},
+                {", ".join(f"{c} = EXCLUDED.{c}" for c in columns[1:])},
                 is_simulated = EXCLUDED.is_simulated,
                 _ingested_at = EXCLUDED._ingested_at,
                 _source_file = EXCLUDED._source_file;
@@ -184,10 +218,10 @@ class TapLoader:
 
         return len(records)
 
-    def run(self, csv_file_path: Optional[str] = None, batch_size: int = 5000) -> Dict[str, Any]:
+    def run(self, csv_file_path: str | None = None, batch_size: int = 5000) -> dict[str, Any]:
         """Execute the full tap transaction loading pipeline."""
         start_time = time.time()
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         logger.info("=== Starting TransJakarta Historical Tap Data Ingestion ===")
 
         target_file = csv_file_path or self.ensure_dataset_available()
@@ -198,23 +232,43 @@ class TapLoader:
             self.init_database_schema(conn)
 
             columns = [
-                "trans_id", "pay_card_id", "pay_card_bank", "pay_card_name",
-                "pay_card_sex", "pay_card_birth_date", "corridor_id", "corridor_name",
-                "direction", "tap_in_stops", "tap_in_stops_name", "tap_in_stops_lat",
-                "tap_in_stops_lon", "stop_start_seq", "tap_in_time", "tap_out_stops",
-                "tap_out_stops_name", "tap_out_stops_lat", "tap_out_stops_lon",
-                "stop_end_seq", "tap_out_time", "pay_amount"
+                "trans_id",
+                "pay_card_id",
+                "pay_card_bank",
+                "pay_card_name",
+                "pay_card_sex",
+                "pay_card_birth_date",
+                "corridor_id",
+                "corridor_name",
+                "direction",
+                "tap_in_stops",
+                "tap_in_stops_name",
+                "tap_in_stops_lat",
+                "tap_in_stops_lon",
+                "stop_start_seq",
+                "tap_in_time",
+                "tap_out_stops",
+                "tap_out_stops_name",
+                "tap_out_stops_lat",
+                "tap_out_stops_lon",
+                "stop_end_seq",
+                "tap_out_time",
+                "pay_amount",
             ]
 
             total_valid = 0
             total_invalid = 0
-            current_batch: List[Dict[str, Any]] = []
+            current_batch: list[dict[str, Any]] = []
 
-            with open(target_file, "r", encoding="utf-8-sig") as f:
+            with open(target_file, encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 for row_idx, row in enumerate(reader, start=1):
                     # Clean whitespace & map empty strings to None
-                    cleaned = {k.strip(): (v.strip() if v is not None and v.strip() != "" else None) for k, v in row.items() if k}
+                    cleaned = {
+                        k.strip(): (v.strip() if v is not None and v.strip() != "" else None)
+                        for k, v in row.items()
+                        if k
+                    }
 
                     try:
                         valid_model = RawTapTransaction.model_validate(cleaned)
@@ -223,16 +277,29 @@ class TapLoader:
                     except ValidationError as val_err:
                         total_invalid += 1
                         if total_invalid <= 5:
-                            logger.warning("Validation error on row %d: %s (Row: %s)", row_idx, val_err.errors(), cleaned)
+                            logger.warning(
+                                "Validation error on row %d: %s (Row: %s)",
+                                row_idx,
+                                val_err.errors(),
+                                cleaned,
+                            )
 
                     if len(current_batch) >= batch_size:
-                        inserted = self.load_records_batch(conn, current_batch, columns, now_utc, source_label)
-                        logger.info("Loaded batch of %d records (Progress: %d total valid rows loaded)", inserted, total_valid)
+                        inserted = self.load_records_batch(
+                            conn, current_batch, columns, now_utc, source_label
+                        )
+                        logger.info(
+                            "Loaded batch of %d records (Progress: %d total valid rows loaded)",
+                            inserted,
+                            total_valid,
+                        )
                         current_batch = []
 
                 # Final flush
                 if current_batch:
-                    inserted = self.load_records_batch(conn, current_batch, columns, now_utc, source_label)
+                    inserted = self.load_records_batch(
+                        conn, current_batch, columns, now_utc, source_label
+                    )
                     logger.info("Loaded final batch of %d records", inserted)
 
         finally:

@@ -12,12 +12,13 @@ import os
 import sys
 import time
 import zipfile
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Type
+from datetime import UTC, datetime
+from typing import Any
+
 import psycopg2
+from dotenv import load_dotenv
 from psycopg2.extras import execute_values
 from pydantic import BaseModel, ValidationError
-from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -43,6 +44,7 @@ DEFAULT_GTFS_URL = "https://gtfs.transjakarta.co.id/files/file_gtfs.zip"
 
 class GTFSIngestionError(Exception):
     """Base exception for GTFS ingestion failures."""
+
     pass
 
 
@@ -51,23 +53,35 @@ class GTFSIngestor:
 
     def __init__(
         self,
-        db_host: Optional[str] = None,
-        db_port: Optional[int] = None,
-        db_name: Optional[str] = None,
-        db_user: Optional[str] = None,
-        db_password: Optional[str] = None,
-        feed_url: Optional[str] = None,
+        db_host: str | None = None,
+        db_port: int | None = None,
+        db_name: str | None = None,
+        db_user: str | None = None,
+        db_password: str | None = None,
+        feed_url: str | None = None,
     ):
         self.db_host = db_host or os.getenv("POSTGRES_HOST", "localhost")
         self.db_port = int(db_port or os.getenv("POSTGRES_PORT", 5432))
-        self.db_name = db_name or os.getenv("POSTGRES_DB_WAREHOUSE", os.getenv("POSTGRES_DB", "warehouse"))
-        self.db_user = db_user or os.getenv("POSTGRES_INGESTION_USER", os.getenv("POSTGRES_USER", "postgres"))
-        self.db_password = db_password or os.getenv("POSTGRES_INGESTION_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres_dev_password"))
+        self.db_name = db_name or os.getenv(
+            "POSTGRES_DB_WAREHOUSE", os.getenv("POSTGRES_DB", "warehouse")
+        )
+        self.db_user = db_user or os.getenv(
+            "POSTGRES_INGESTION_USER", os.getenv("POSTGRES_USER", "postgres")
+        )
+        self.db_password = db_password or os.getenv(
+            "POSTGRES_INGESTION_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres_dev_password")
+        )
         self.feed_url = feed_url or os.getenv("GTFS_FEED_URL", DEFAULT_GTFS_URL)
 
     def get_connection(self) -> psycopg2.extensions.connection:
         """Establish connection to the target PostgreSQL database."""
-        logger.info("Connecting to PostgreSQL at %s:%s/%s as %s", self.db_host, self.db_port, self.db_name, self.db_user)
+        logger.info(
+            "Connecting to PostgreSQL at %s:%s/%s as %s",
+            self.db_host,
+            self.db_port,
+            self.db_name,
+            self.db_user,
+        )
         try:
             conn = psycopg2.connect(
                 host=self.db_host,
@@ -90,7 +104,9 @@ class GTFSIngestor:
         logger.info("Downloading TransJakarta GTFS feed from %s", self.feed_url)
         for attempt in range(1, retries + 1):
             try:
-                response = requests.get(self.feed_url, timeout=timeout, headers={"User-Agent": "KoridorTJ-Ingest/1.0"})
+                response = requests.get(
+                    self.feed_url, timeout=timeout, headers={"User-Agent": "KoridorTJ-Ingest/1.0"}
+                )
                 response.raise_for_status()
                 content = response.content
                 if not content:
@@ -100,8 +116,10 @@ class GTFSIngestor:
             except Exception as exc:
                 logger.warning("Download attempt %d/%d failed: %s", attempt, retries, exc)
                 if attempt == retries:
-                    raise GTFSIngestionError(f"Failed to download GTFS feed after {retries} attempts: {exc}") from exc
-                time.sleep(2 ** attempt)
+                    raise GTFSIngestionError(
+                        f"Failed to download GTFS feed after {retries} attempts: {exc}"
+                    ) from exc
+                time.sleep(2**attempt)
 
         raise GTFSIngestionError("Unexpected download loop termination")
 
@@ -129,11 +147,11 @@ class GTFSIngestor:
         self,
         zf: zipfile.ZipFile,
         filename: str,
-        model_cls: Type[BaseModel],
-    ) -> Tuple[List[Dict[str, Any]], int, int]:
+        model_cls: type[BaseModel],
+    ) -> tuple[list[dict[str, Any]], int, int]:
         """Extract and validate records from a GTFS CSV file inside the zip archive."""
         logger.info("Parsing and validating %s ...", filename)
-        valid_records: List[Dict[str, Any]] = []
+        valid_records: list[dict[str, Any]] = []
         invalid_count = 0
 
         with zf.open(filename) as f:
@@ -143,7 +161,9 @@ class GTFSIngestor:
 
             for row_idx, row in enumerate(reader, start=1):
                 # Clean empty string keys or whitespace
-                cleaned_row = {k.strip(): (v.strip() if v is not None else None) for k, v in row.items() if k}
+                cleaned_row = {
+                    k.strip(): (v.strip() if v is not None else None) for k, v in row.items() if k
+                }
                 # Convert empty strings to None for optional fields
                 cleaned_row = {k: (v if v != "" else None) for k, v in cleaned_row.items()}
 
@@ -153,9 +173,18 @@ class GTFSIngestor:
                 except ValidationError as exc:
                     invalid_count += 1
                     if invalid_count <= 5:
-                        logger.warning("Validation error in %s row %d: %s (Sample data: %s)", filename, row_idx, exc.errors(), cleaned_row)
+                        logger.warning(
+                            "Validation error in %s row %d: %s (Sample data: %s)",
+                            filename,
+                            row_idx,
+                            exc.errors(),
+                            cleaned_row,
+                        )
                     elif invalid_count == 6:
-                        logger.warning("Further validation errors in %s will be suppressed from logging.", filename)
+                        logger.warning(
+                            "Further validation errors in %s will be suppressed from logging.",
+                            filename,
+                        )
 
         total_rows = len(valid_records) + invalid_count
         logger.info(
@@ -256,8 +285,8 @@ class GTFSIngestor:
         self,
         conn: psycopg2.extensions.connection,
         table_name: str,
-        columns: List[str],
-        records: List[Dict[str, Any]],
+        columns: list[str],
+        records: list[dict[str, Any]],
         ingested_at: datetime,
     ) -> int:
         """Perform transactional idempotent bulk load into target raw table."""
@@ -269,15 +298,14 @@ class GTFSIngestor:
         # Prepare list of row tuples matching columns + audit columns
         full_columns = columns + ["_ingested_at", "_source_url"]
         rows_to_insert = [
-            tuple(r.get(c) for c in columns) + (ingested_at, self.feed_url)
-            for r in records
+            tuple(r.get(c) for c in columns) + (ingested_at, self.feed_url) for r in records
         ]
 
         query = f"""
-            INSERT INTO {table_name} ({', '.join(full_columns)})
+            INSERT INTO {table_name} ({", ".join(full_columns)})
             VALUES %s
             ON CONFLICT ({columns[0]}) DO UPDATE SET
-                {', '.join(f"{c} = EXCLUDED.{c}" for c in columns[1:])},
+                {", ".join(f"{c} = EXCLUDED.{c}" for c in columns[1:])},
                 _ingested_at = EXCLUDED._ingested_at,
                 _source_url = EXCLUDED._source_url;
         """
@@ -290,10 +318,10 @@ class GTFSIngestor:
         logger.info("Loaded %d rows into %s (took %.2fs)", len(records), table_name, elapsed)
         return len(records)
 
-    def run(self, local_zip_path: Optional[str] = None) -> Dict[str, Any]:
+    def run(self, local_zip_path: str | None = None) -> dict[str, Any]:
         """Execute full GTFS ingestion pipeline."""
         pipeline_start = time.time()
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         logger.info("=== Starting TransJakarta GTFS Ingestion Pipeline ===")
 
         # 1. Acquire ZIP
@@ -320,32 +348,67 @@ class GTFSIngestor:
 
             # Load routes
             route_cols = [
-                "route_id", "agency_id", "route_short_name", "route_long_name",
-                "route_desc", "route_type", "route_url", "route_color",
-                "route_text_color", "route_sort_order", "ticketing_deep_link_id"
+                "route_id",
+                "agency_id",
+                "route_short_name",
+                "route_long_name",
+                "route_desc",
+                "route_type",
+                "route_url",
+                "route_color",
+                "route_text_color",
+                "route_sort_order",
+                "ticketing_deep_link_id",
             ]
             self.load_table(conn, "raw.gtfs_routes", route_cols, routes_data, now_utc)
 
             # Load stops
             stop_cols = [
-                "stop_id", "stop_code", "stop_name", "stop_desc", "stop_lat",
-                "stop_lon", "zone_id", "stop_url", "location_type",
-                "parent_station", "stop_timezone", "wheelchair_boarding", "platform_code"
+                "stop_id",
+                "stop_code",
+                "stop_name",
+                "stop_desc",
+                "stop_lat",
+                "stop_lon",
+                "zone_id",
+                "stop_url",
+                "location_type",
+                "parent_station",
+                "stop_timezone",
+                "wheelchair_boarding",
+                "platform_code",
             ]
             self.load_table(conn, "raw.gtfs_stops", stop_cols, stops_data, now_utc)
 
             # Load trips
             trip_cols = [
-                "trip_id", "route_id", "service_id", "trip_headsign", "trip_short_name",
-                "direction_id", "block_id", "shape_id", "wheelchair_accessible",
-                "bikes_allowed", "ticketing_trip_id", "ticketing_type"
+                "trip_id",
+                "route_id",
+                "service_id",
+                "trip_headsign",
+                "trip_short_name",
+                "direction_id",
+                "block_id",
+                "shape_id",
+                "wheelchair_accessible",
+                "bikes_allowed",
+                "ticketing_trip_id",
+                "ticketing_type",
             ]
             self.load_table(conn, "raw.gtfs_trips", trip_cols, trips_data, now_utc)
 
             # Load calendar
             cal_cols = [
-                "service_id", "monday", "tuesday", "wednesday", "thursday",
-                "friday", "saturday", "sunday", "start_date", "end_date"
+                "service_id",
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+                "start_date",
+                "end_date",
             ]
             self.load_table(conn, "raw.gtfs_calendar", cal_cols, calendar_data, now_utc)
 

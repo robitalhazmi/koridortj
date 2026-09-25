@@ -1,8 +1,7 @@
 """Unit tests for Airflow DAG structure, integrity, and cycle validation."""
 
 import pytest
-import os
-import sys
+
 
 # Test DAG definitions
 def test_gtfs_ingest_dag_structure():
@@ -10,6 +9,7 @@ def test_gtfs_ingest_dag_structure():
     # Mock airflow imports if not in environment or test directly
     try:
         from airflow.models import DagBag
+
         dagbag = DagBag(dag_folder="dags", include_examples=False)
         assert len(dagbag.import_errors) == 0, f"DAG import errors: {dagbag.import_errors}"
 
@@ -22,13 +22,16 @@ def test_gtfs_ingest_dag_structure():
         assert "ingest_gtfs_data" in task_ids
         assert "verify_row_counts" in task_ids
     except ImportError:
-        pytest.skip("Airflow not installed in host test environment; tested inside Airflow container")
+        pytest.skip(
+            "Airflow not installed in host test environment; tested inside Airflow container"
+        )
 
 
 def test_warehouse_build_dag_structure():
     """Verify warehouse_build DAG loads without syntax error and has expected task flow."""
     try:
         from airflow.models import DagBag
+
         dagbag = DagBag(dag_folder="dags", include_examples=False)
         assert len(dagbag.import_errors) == 0, f"DAG import errors: {dagbag.import_errors}"
 
@@ -43,4 +46,6 @@ def test_warehouse_build_dag_structure():
         assert "dbt_test_quality_gate" in task_ids
         assert "dbt_generate_docs" in task_ids
     except ImportError:
-        pytest.skip("Airflow not installed in host test environment; tested inside Airflow container")
+        pytest.skip(
+            "Airflow not installed in host test environment; tested inside Airflow container"
+        )

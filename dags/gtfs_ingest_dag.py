@@ -4,8 +4,9 @@ Downloads the official GTFS zip, validates its structure and schemas, and loads 
 stops, trips, and calendars into PostgreSQL raw tables idempotently.
 """
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
+
 import requests
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -16,11 +17,19 @@ logger = logging.getLogger("airflow.task")
 def check_feed_availability():
     """Verify that the official TransJakarta GTFS feed endpoint is responsive."""
     from ingestion.gtfs_ingest import DEFAULT_GTFS_URL
+
     logger.info("Checking availability for GTFS endpoint: %s", DEFAULT_GTFS_URL)
-    response = requests.head(DEFAULT_GTFS_URL, timeout=30, headers={"User-Agent": "Airflow-HealthCheck/1.0"})
+    response = requests.head(
+        DEFAULT_GTFS_URL, timeout=30, headers={"User-Agent": "Airflow-HealthCheck/1.0"}
+    )
     if response.status_code not in (200, 302, 307):
         # Retry with GET in case HEAD is not allowed
-        response = requests.get(DEFAULT_GTFS_URL, stream=True, timeout=30, headers={"User-Agent": "Airflow-HealthCheck/1.0"})
+        response = requests.get(
+            DEFAULT_GTFS_URL,
+            stream=True,
+            timeout=30,
+            headers={"User-Agent": "Airflow-HealthCheck/1.0"},
+        )
     response.raise_for_status()
     logger.info("GTFS feed endpoint is reachable (HTTP %d)", response.status_code)
     return True
@@ -29,6 +38,7 @@ def check_feed_availability():
 def execute_gtfs_ingestion():
     """Run the GTFSIngestor pipeline to parse and load reference data."""
     from ingestion.gtfs_ingest import GTFSIngestor
+
     ingestor = GTFSIngestor()
     summary = ingestor.run()
     logger.info("Ingestion completed with summary: %s", summary)
@@ -37,7 +47,6 @@ def execute_gtfs_ingestion():
 
 def verify_ingested_row_counts():
     """Verify that raw tables have been populated and log current table metrics."""
-    import psycopg2
     from ingestion.gtfs_ingest import GTFSIngestor
 
     ingestor = GTFSIngestor()
@@ -84,7 +93,6 @@ with DAG(
     max_active_runs=1,
     tags=["transjakarta", "gtfs", "ingestion", "reference_data"],
 ) as dag:
-
     task_check_availability = PythonOperator(
         task_id="check_feed_availability",
         python_callable=check_feed_availability,
