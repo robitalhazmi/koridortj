@@ -119,11 +119,93 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  superset-init:
+    image: apache/superset:4.0.1
+    container_name: koridortj-superset-init
+    user: "0"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-koridortj_superset_secret_key_9876543210abcdef}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB_SUPERSET: ${POSTGRES_DB_SUPERSET:-superset_meta}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/superset_init.sh:/app/docker-init.sh:ro
+      - superset_home:/app/superset_home
+    entrypoint: ["/bin/bash", "/app/docker-init.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - koridortj-network
+
+  superset:
+    image: apache/superset:4.0.1
+    container_name: koridortj-superset
+    restart: unless-stopped
+    user: "0"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-koridortj_superset_secret_key_9876543210abcdef}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB_SUPERSET: ${POSTGRES_DB_SUPERSET:-superset_meta}
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/app/superset_home
+    ports:
+      - "8088:8088"
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8088/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - koridortj-network
+
+  token-service:
+    build:
+      context: .
+      dockerfile: services/guest_token_service/Dockerfile
+    container_name: koridortj-token-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB_WAREHOUSE: ${POSTGRES_DB_WAREHOUSE:-warehouse}
+      POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-superset_ro}
+      POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD:-superset_ro_dev_password}
+      SUPERSET_DOMAIN: ${SUPERSET_DOMAIN:-http://localhost:8088}
+      SUPERSET_DASHBOARD_ID: ${SUPERSET_DASHBOARD_ID:-transjakarta-ridership-overview}
+      SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - koridortj-network
+
 volumes:
   postgres_data:
     name: koridortj_postgres_data
+  superset_home:
+
+    name: koridortj_superset_home
 
 networks:
   koridortj-network:
     name: koridortj-network
     driver: bridge
+

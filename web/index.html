@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KoridorTJ — TransJakarta Transit Intelligence Platform</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Chart.js for live telemetry -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Superset Embedded SDK -->
+  <script src="https://unpkg.com/@superset-ui/embedded-sdk"></script>
+</head>
+<body>
+  <!-- Header -->
+  <header class="navbar">
+    <div class="container nav-container">
+      <div class="brand">
+        <div class="brand-logo">🚌</div>
+        <div>
+          <h1 class="brand-title">Koridor<span>TJ</span></h1>
+          <p class="brand-subtitle">TransJakarta Transit Intelligence Platform</p>
+        </div>
+      </div>
+      <div class="nav-links">
+        <span class="status-badge"><span class="pulse-dot"></span> Pipeline Active</span>
+        <a href="https://github.com/robitalhazmi/koridortj" target="_blank" class="nav-btn">GitHub</a>
+        <a href="/api/stats" target="_blank" class="nav-btn secondary">API Stats</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Simulated Data Disclaimer Banner -->
+  <div class="disclaimer-banner">
+    <div class="container disclaimer-content">
+      <span class="warning-icon">ℹ️</span>
+      <div>
+        <strong>Data Governance & Provenance Notice:</strong>
+        Reference routes, stops, and schedules are ingested from official <strong>PT Transportasi Jakarta GTFS</strong> feeds. All passenger tap transactions are <strong>simulated data (<code>is_simulated = TRUE</code>)</strong> modeled for portfolio and analytics demonstration.
+      </div>
+    </div>
+  </div>
+
+  <main class="container main-content">
+    <!-- Hero / KPI Overview -->
+    <section class="kpi-grid" id="kpi-section">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Tap Events</div>
+        <div class="kpi-value" id="kpi-total-taps">—</div>
+        <div class="kpi-sub">Historical + Real-time Stream</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active BRT & Feeder Routes</div>
+        <div class="kpi-value" id="kpi-routes">—</div>
+        <div class="kpi-sub">GTFS Conformed Dimension</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Transit Stops & Shelters</div>
+        <div class="kpi-value" id="kpi-stops">—</div>
+        <div class="kpi-sub">WGS84 Coordinates Mapped</div>
+      </div>
+      <div class="kpi-card highlight">
+        <div class="kpi-label">Data Quality Gate</div>
+        <div class="kpi-value">80 / 80</div>
+        <div class="kpi-sub">100% dbt Tests Passing</div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('analytics')">📊 Live Warehouse Analytics</button>
+      <button class="tab-btn" onclick="switchTab('embedded')">🖥️ Apache Superset Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('architecture')">🏗️ Architecture & Lineage</button>
+    </div>
+
+    <!-- Tab 1: Live Warehouse Analytics -->
+    <div id="tab-analytics" class="tab-pane active">
+      <div class="grid-2col">
+        <!-- Hourly Volume Chart -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Hourly Tap-In Ridership Pattern</h3>
+            <span class="badge">Peak Analysis</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="hourlyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Payment Issuer Market Share -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Card Issuer / Bank Market Share</h3>
+            <span class="badge">Payment Telemetry</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="bankChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Busiest Stops Table -->
+      <div class="card mt-20">
+        <div class="card-header">
+          <h3>Top 5 Busiest Boarding Stations</h3>
+          <span class="badge">Shelter Demand</span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Stop / Shelter Name</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Total Tap-Ins</th>
+              </tr>
+            </thead>
+            <tbody id="top-stops-tbody">
+              <tr><td colspan="5" class="text-center">Loading live warehouse telemetry...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Embedded Superset Dashboard -->
+    <div id="tab-embedded" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Apache Superset Embedded Dashboard</h3>
+            <p class="card-sub">Secured via short-lived JWT Guest Tokens minted by the FastAPI token service.</p>
+          </div>
+          <button class="btn btn-sm" onclick="loadEmbeddedDashboard()">🔄 Refresh Session</button>
+        </div>
+        <div id="dashboard-embed-container" class="embed-box">
+          <div class="embed-placeholder" id="embed-loader">
+            <div class="spinner"></div>
+            <p>Authenticating with Superset Guest Token Service...</p>
+            <p class="text-muted text-sm">Target URL: <span id="superset-target-label">http://localhost:8088</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Architecture & Lineage -->
+    <div id="tab-architecture" class="tab-pane">
+      <div class="card">
+        <div class="card-header">
+          <h3>End-to-End Enterprise Transit Data Architecture</h3>
+          <span class="badge">Medallion Design</span>
+        </div>
+        <div class="architecture-grid">
+          <div class="arch-box">
+            <h4>1. Ingestion Layer</h4>
+            <ul>
+              <li><strong>GTFS Puller</strong>: Weekly Python pipeline downloading official TransJakarta transit feeds.</li>
+              <li><strong>Kafka KRaft</strong>: Real-time replay producer streaming transaction payloads to <code>taps.raw</code>.</li>
+              <li><strong>Dead-Letter Queue</strong>: Pydantic schema validation isolating malformed messages to <code>taps.deadletter</code>.</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>2. Storage & Modeling</h4>
+            <ul>
+              <li><strong>PostgreSQL 16</strong>: High performance relational storage (schemas: <code>raw</code>, <code>staging</code>, <code>warehouse</code>).</li>
+              <li><strong>dbt Core</strong>: 11 models transforming raw entities into a conformed star schema (<code>fact_taps</code>, <code>dim_*</code>).</li>
+              <li><strong>Quality Gate</strong>: 80 automated unit & schema tests blocking corrupted data from reporting views.</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>3. Orchestration & BI</h4>
+            <ul>
+              <li><strong>Apache Airflow</strong>: Automated DAGs for weekly GTFS ingestion and nightly warehouse builds.</li>
+              <li><strong>Apache Superset</strong>: Read-only visual analytics with <code>superset_ro</code> security roles.</li>
+              <li><strong>Guest Token Gateway</strong>: FastAPI service issuing ephemeral guest tokens for public dashboard embeds.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <p><strong>KoridorTJ Transit Data Platform</strong> &bull; Open-Source Data Engineering Portfolio</p>
+      <p class="footer-sub">Stack: Kafka 3.7 (KRaft) &bull; PostgreSQL 16 &bull; dbt Core &bull; Apache Airflow &bull; Apache Superset &bull; FastAPI</p>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

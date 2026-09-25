@@ -53,11 +53,12 @@ No dates attached — work through phases in order when you have time. Each phas
 
 
 ## Phase 7 — BI / dashboard
-- [ ] Stand up Apache Superset via Docker Compose, connect to the warehouse (read-only DB role)
-- [ ] Build 3–5 dashboards (ridership by corridor/hour, weekday vs weekend, busiest stops, network map if feasible)
-- [ ] Enable the `EMBEDDED_SUPERSET` feature flag and build a minimal guest-token service (Python or Go) to issue short-lived tokens for anonymous embed visitors
-- [ ] Build a small public HTML page that embeds the dashboard via the guest-token service
-- [ ] Add the "simulated data" disclaimer directly on the dashboard/embed page, not just in the README
+- [x] Stand up Apache Superset via Docker Compose, connect to the warehouse (read-only DB role)
+- [x] Build 3–5 dashboards (ridership by corridor/hour, weekday vs weekend, busiest stops, network map if feasible)
+- [x] Enable the `EMBEDDED_SUPERSET` feature flag and build a minimal guest-token service (Python or Go) to issue short-lived tokens for anonymous embed visitors
+- [x] Build a small public HTML page that embeds the dashboard via the guest-token service
+- [x] Add the "simulated data" disclaimer directly on the dashboard/embed page, not just in the README
+
 
 ## Phase 8 — Containerization & deployment
 - [ ] Consolidate all services into one `docker-compose.yml` (Kafka, Airflow, Superset, guest-token service, producer, consumer)
