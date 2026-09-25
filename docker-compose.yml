@@ -101,7 +101,7 @@ services:
     restart: unless-stopped
     command: webserver
     ports:
-      - "${AIRFLOW_PORT:-8080}:8080"
+      - "${AIRFLOW_PORT:-8082}:8080"
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -145,9 +145,21 @@ services:
       SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}
     volumes:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
-      - ./superset/superset_init.sh:/app/docker-init.sh:ro
       - superset_home:/app/superset_home
-    entrypoint: ["/bin/bash", "/app/docker-init.sh"]
+    command: >
+      bash -c "
+      echo '=== Upgrading Superset DB ===' &&
+      superset db upgrade &&
+      echo '=== Creating Superset Admin ===' &&
+      superset fab create-admin \
+        --username $${SUPERSET_ADMIN_USERNAME:-admin} \
+        --firstname Admin \
+        --lastname User \
+        --email $${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id} \
+        --password $${SUPERSET_ADMIN_PASSWORD:-admin} || true &&
+      echo '=== Initializing Roles ===' &&
+      superset init
+      "
     depends_on:
       postgres:
         condition: service_healthy
@@ -193,7 +205,7 @@ services:
       dockerfile: services/guest_token_service/Dockerfile
     restart: unless-stopped
     ports:
-      - "${PORT:-8000}:8000"
+      - "${PORT:-8005}:8000"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
