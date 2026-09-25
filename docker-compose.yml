@@ -1,0 +1,2 @@
+# Docker Compose configuration for KoridorTJ stack
+# Placeholder: will be configured in subsequent phases (Airflow, Kafka, Postgres, Superset, services)

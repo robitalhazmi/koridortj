@@ -1,0 +1,13 @@
+# GitHub Actions CD Workflow for KoridorTJ
+# Placeholder: will be configured in Phase 9 (build Docker images, push to GHCR, trigger Coolify deploy)
+name: CD
+on:
+  push:
+    branches: [main]
+jobs:
+  cd-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder Step
+        run: echo "CD pipeline to be implemented in Phase 9"

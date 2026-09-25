@@ -1,0 +1,13 @@
+# GitHub Actions CI Workflow for KoridorTJ
+# Placeholder: will be configured in Phase 9 (lint, pytest, dbt test against postgres)
+name: CI
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  ci-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder Step
+        run: echo "CI pipeline to be implemented in Phase 9"

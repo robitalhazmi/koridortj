@@ -1,0 +1,5 @@
+# dbt project configuration for KoridorTJ
+# Placeholder: will be configured in Phase 3
+name: 'koridortj'
+version: '1.0.0'
+config-version: 2
