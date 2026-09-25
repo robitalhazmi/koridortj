@@ -271,4 +271,5 @@ volumes:
 
 networks:
   koridortj-network:
+    name: koridortj-network
     driver: bridge
