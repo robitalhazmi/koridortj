@@ -44,6 +44,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - koridortj-network
 
@@ -73,6 +78,11 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
     networks:
       - koridortj-network
 
@@ -109,6 +119,11 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
 
   airflow-scheduler:
     <<: *airflow-common
@@ -118,6 +133,11 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
 
   superset-init:
     image: apache/superset:4.0.1
@@ -171,6 +191,11 @@ services:
       interval: 15s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
     networks:
       - koridortj-network
 
@@ -184,16 +209,74 @@ services:
       - "8000:8000"
     environment:
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_PORT: "5432"
       POSTGRES_DB_WAREHOUSE: ${POSTGRES_DB_WAREHOUSE:-warehouse}
       POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-superset_ro}
       POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD:-superset_ro_dev_password}
       SUPERSET_DOMAIN: ${SUPERSET_DOMAIN:-http://localhost:8088}
-      SUPERSET_DASHBOARD_ID: ${SUPERSET_DASHBOARD_ID:-transjakarta-ridership-overview}
+      SUPERSET_DASHBOARD_ID: ${SUPERSET_DASHBOARD_ID:-45d44fda-4e9c-4a88-894d-819f66fbfd33}
       SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - koridortj-network
+
+  replay-producer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.producer
+    container_name: koridortj-replay-producer
+    restart: unless-stopped
+    profiles:
+      - streaming
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC_RAW: taps.raw
+      REPLAY_SPEED_MULTIPLIER: "60.0"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - koridortj-network
+
+  tap-consumer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.consumer
+    container_name: koridortj-tap-consumer
+    restart: unless-stopped
+    profiles:
+      - streaming
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC_RAW: taps.raw
+      KAFKA_TOPIC_DLQ: taps.deadletter
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB_WAREHOUSE: ${POSTGRES_DB_WAREHOUSE:-warehouse}
+      POSTGRES_INGESTION_USER: ${POSTGRES_INGESTION_USER:-ingestion_user}
+      POSTGRES_INGESTION_PASSWORD: ${POSTGRES_INGESTION_PASSWORD:-ingestion_dev_password}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
     networks:
       - koridortj-network
 
@@ -201,11 +284,9 @@ volumes:
   postgres_data:
     name: koridortj_postgres_data
   superset_home:
-
     name: koridortj_superset_home
 
 networks:
   koridortj-network:
     name: koridortj-network
     driver: bridge
-

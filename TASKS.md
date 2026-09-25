@@ -61,11 +61,11 @@ No dates attached — work through phases in order when you have time. Each phas
 
 
 ## Phase 8 — Containerization & deployment
-- [ ] Consolidate all services into one `docker-compose.yml` (Kafka, Airflow, Superset, guest-token service, producer, consumer)
-- [ ] In Coolify: create a Docker Compose resource pointed at the repo, plus a managed Postgres database resource (`warehouse` + `airflow_meta` databases)
-- [ ] Assign subdomains to public-facing services only (embed page, dbt docs) in Coolify; leave Airflow/Superset admin unexposed
-- [ ] Deploy manually once via the Coolify UI to confirm everything works end-to-end
-- [ ] Document VPS resource usage (RAM/CPU) — right-size the compose file if the VPS is small
+- [x] Consolidate all services into one `docker-compose.yml` (Kafka, Airflow, Superset, guest-token service, producer, consumer)
+- [x] In Coolify: create a Docker Compose resource pointed at the repo, plus a managed Postgres database resource (`warehouse` + `airflow_meta` databases)
+- [x] Assign subdomains to public-facing services only (embed page, dbt docs) in Coolify; leave Airflow/Superset admin unexposed
+- [x] Deploy manually once via the Coolify UI to confirm everything works end-to-end
+- [x] Document VPS resource usage (RAM/CPU) — right-size the compose file if the VPS is small
 
 ## Phase 9 — CI/CD
 - [ ] GitHub Actions: lint job (ruff/black for Python, sqlfluff for SQL)
