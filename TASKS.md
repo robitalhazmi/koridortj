@@ -46,10 +46,11 @@ No dates attached — work through phases in order when you have time. Each phas
 
 
 ## Phase 6 — Data quality & governance
-- [ ] Add dbt schema tests: `not_null`, `unique`, `relationships`, `accepted_values` on key columns
-- [ ] Add at least 3 custom singular dbt tests (e.g., no future timestamps, tap-out after tap-in, valid stop references)
-- [ ] Generate `dbt docs` and confirm the lineage graph renders correctly
-- [ ] Write `/docs/data_dictionary.md` and `/docs/erd.md` (Mermaid ERD)
+- [x] Add dbt schema tests: `not_null`, `unique`, `relationships`, `accepted_values` on key columns
+- [x] Add at least 3 custom singular dbt tests (e.g., no future timestamps, tap-out after tap-in, valid stop references)
+- [x] Generate `dbt docs` and confirm the lineage graph renders correctly
+- [x] Write `/docs/data_dictionary.md` and `/docs/erd.md` (Mermaid ERD)
+
 
 ## Phase 7 — BI / dashboard
 - [ ] Stand up Apache Superset via Docker Compose, connect to the warehouse (read-only DB role)

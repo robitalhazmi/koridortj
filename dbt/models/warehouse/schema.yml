@@ -2,58 +2,80 @@ version: 2
 
 models:
   - name: dim_routes
-    description: "Conformed dimension table representing TransJakarta routes, corridors, and services."
+    description: "Conformed dimension table representing TransJakarta routes, BRT corridors, and feeder services integrated from official GTFS and operational sources."
     columns:
       - name: route_id
-        description: "Primary key identifier for the route or corridor."
+        description: "Primary key identifier for the route or corridor (e.g. '1', '9C', 'GR1')."
         tests:
           - not_null
           - unique
+      - name: route_short_name
+        description: "Short public route code/number displayed on bus destination signs."
+      - name: route_long_name
+        description: "Full descriptive endpoint-to-endpoint route designation."
       - name: route_name
-        description: "Full descriptive name of the route."
+        description: "Standardized route name resolved from long name or corridor description."
         tests:
           - not_null
+      - name: route_desc
+        description: "Transit service type description (e.g., BRT, Non-BRT, Mikrotrans, RoyalTrans)."
       - name: route_type
-        description: "Route classification code (3 = Bus/BRT)."
+        description: "GTFS route type integer code (3 = Bus/BRT transit)."
         tests:
           - not_null
+          - accepted_values:
+              values: [3]
+      - name: route_color
+        description: "Hexadecimal color code assigned for map visualization and signage."
+      - name: route_text_color
+        description: "Hexadecimal color code for route text labels."
 
   - name: dim_stops
-    description: "Conformed dimension table representing TransJakarta bus stops, shelters, and stations with coordinates."
+    description: "Conformed dimension table representing TransJakarta bus stops, shelters, and interchange stations with spatial coordinates."
     columns:
       - name: stop_id
         description: "Primary key identifier for the stop/shelter."
         tests:
           - not_null
           - unique
+      - name: stop_code
+        description: "Public stop identifier code."
       - name: stop_name
-        description: "Public name of the transit stop."
+        description: "Official public name of the transit stop/shelter."
         tests:
           - not_null
+      - name: stop_desc
+        description: "Descriptive location notes or road reference."
       - name: latitude
-        description: "Latitude GPS coordinate."
+        description: "Latitude GPS coordinate (WGS84) in Jakarta metropolitan area."
         tests:
           - not_null
       - name: longitude
-        description: "Longitude GPS coordinate."
+        description: "Longitude GPS coordinate (WGS84) in Jakarta metropolitan area."
         tests:
           - not_null
+      - name: location_type
+        description: "GTFS location type code (0 = Stop/Platform, 1 = Station)."
+      - name: parent_station
+        description: "Identifier of the parent transit station if stop is a sub-platform."
+      - name: wheelchair_boarding
+        description: "Accessibility code (1 = accessible, 2 = not accessible, 0 = no info)."
 
   - name: dim_corridors
-    description: "Conformed dimension table for BRT corridors and directional branches."
+    description: "Conformed dimension table for BRT trunk corridors and branch feeder lines."
     columns:
       - name: corridor_code
-        description: "Primary key code for the corridor."
+        description: "Primary key code for the corridor (e.g. '1', '2A', '9')."
         tests:
           - not_null
           - unique
       - name: corridor_name
-        description: "Descriptive name of the corridor."
+        description: "Official descriptive title of the BRT corridor route."
         tests:
           - not_null
 
   - name: dim_calendar
-    description: "Date dimension table covering transit operational dates with calendar attributes."
+    description: "Date dimension table covering transit operational dates with calendar attributes for temporal analysis."
     columns:
       - name: date_id
         description: "Integer surrogate primary key in YYYYMMDD format."
@@ -61,57 +83,127 @@ models:
           - not_null
           - unique
       - name: full_date
-        description: "Date value."
+        description: "Full calendar date (YYYY-MM-DD)."
         tests:
           - not_null
           - unique
-      - name: is_weekend
-        description: "Boolean flag for Saturday and Sunday."
+      - name: year
+        description: "Four-digit calendar year."
         tests:
           - not_null
+      - name: quarter
+        description: "Calendar quarter (1 to 4)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+      - name: month
+        description: "Month of the year (1 to 12)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      - name: month_name
+        description: "Full English month name (e.g. 'April', 'September')."
+        tests:
+          - not_null
+      - name: day_of_month
+        description: "Day of the month (1 to 31)."
+        tests:
+          - not_null
+      - name: day_of_week
+        description: "ISO day of week index (1 = Monday, 7 = Sunday)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7]
+      - name: day_name
+        description: "Full English day name (e.g. 'Monday', 'Saturday')."
+        tests:
+          - not_null
+      - name: is_weekend
+        description: "Boolean flag (TRUE for Saturday and Sunday, FALSE for weekdays)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
 
   - name: fact_taps
-    description: "Star schema fact table containing individual passenger tap-in and tap-out events."
+    description: "Unified star-schema fact table recording discrete passenger tap-in and tap-out transactions from both historical batches and real-time Kafka streams."
     columns:
       - name: tap_id
-        description: "Unique surrogate key for each tap event."
+        description: "Surrogate primary key uniquely identifying each discrete tap event ('<trans_id>_IN' or '<trans_id>_OUT')."
         tests:
           - not_null
           - unique
       - name: trans_id
-        description: "Transaction ID identifier."
+        description: "Underlying trip transaction identifier grouping matching IN and OUT tap events."
         tests:
           - not_null
+      - name: pay_card_id
+        description: "Anonymized passenger smart card identifier (e-money, Flazz, TapCash, JakLingko)."
+        tests:
+          - not_null
+      - name: pay_card_bank
+        description: "Issuing payment provider or bank (e.g. 'emoney', 'flazz', 'bni', 'dki')."
+      - name: pay_card_name
+        description: "Simulated cardholder name."
+      - name: pay_card_sex
+        description: "Passenger gender code ('M' or 'F')."
+      - name: pay_card_birth_date
+        description: "Passenger birth year."
       - name: route_id
-        description: "Foreign key reference to dim_routes."
+        description: "Foreign key linking the tap event to dim_routes."
         tests:
           - not_null
           - relationships:
               to: ref('dim_routes')
               field: route_id
       - name: stop_id
-        description: "Foreign key reference to dim_stops."
+        description: "Foreign key linking the tap event to dim_stops."
         tests:
           - not_null
           - relationships:
               to: ref('dim_stops')
               field: stop_id
       - name: date_id
-        description: "Foreign key reference to dim_calendar."
+        description: "Foreign key linking the tap event to dim_calendar."
         tests:
           - not_null
           - relationships:
               to: ref('dim_calendar')
               field: date_id
+      - name: corridor_code
+        description: "Corridor code identifier matching dim_corridors."
+      - name: direction
+        description: "Directional travel flag (0 = Outbound, 1 = Inbound)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
       - name: tap_type
-        description: "Event type flag ('IN' or 'OUT')."
+        description: "Event stage flag indicating whether tap occurred upon boarding ('IN') or alighting ('OUT')."
         tests:
           - not_null
           - accepted_values:
               values: ['IN', 'OUT']
+      - name: tap_timestamp
+        description: "Timestamp at which the passenger tapped the fare gate validator."
+        tests:
+          - not_null
+      - name: stop_sequence
+        description: "Sequence position index along the transit corridor route."
+      - name: pay_amount
+        description: "Fare amount charged in IDR (Rp 3,500 standard BRT tariff on tap-in, Rp 0 on tap-out)."
+        tests:
+          - not_null
       - name: is_simulated
-        description: "Explicit constant boolean flag confirming synthetic fact data."
+        description: "Mandatory compliance flag explicitly declaring simulated/synthetic fact origin (always TRUE)."
         tests:
           - not_null
           - accepted_values:
               values: [true]
+      - name: _ingested_at
+        description: "System timestamp recording when the record was ingested into the data platform."
+        tests:
+          - not_null
