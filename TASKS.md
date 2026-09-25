@@ -31,11 +31,11 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Add column-level descriptions in `schema.yml` for every model
 
 ## Phase 4 — Orchestration with Airflow
-- [ ] Stand up Airflow (LocalExecutor) via Docker Compose
-- [ ] DAG 1: `gtfs_ingest` — weekly, runs Phase 1 script
-- [ ] DAG 2: `warehouse_build` — nightly, runs `dbt run` then `dbt test`
-- [ ] Wire failure alerting (even just Airflow's own email/Slack-less failure UI is fine for a portfolio)
-- [ ] Confirm DAGs are idempotent (safe to re-run without duplicating data)
+- [x] Stand up Airflow (LocalExecutor) via Docker Compose
+- [x] DAG 1: `gtfs_ingest` — weekly, runs Phase 1 script
+- [x] DAG 2: `warehouse_build` — nightly, runs `dbt run` then `dbt test`
+- [x] Wire failure alerting (even just Airflow's own email/Slack-less failure UI is fine for a portfolio)
+- [x] Confirm DAGs are idempotent (safe to re-run without duplicating data)
 
 ## Phase 5 — Streaming: replay pipeline
 - [ ] Stand up Kafka (KRaft mode, no ZooKeeper) via Docker Compose
