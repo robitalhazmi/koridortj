@@ -16,6 +16,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+import requests
 from dotenv import load_dotenv
 from kafka import KafkaProducer
 
@@ -34,6 +35,9 @@ DEFAULT_KAFKA_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9094")
 DEFAULT_TOPIC = os.getenv("KAFKA_TOPIC_RAW", "taps.raw")
 DEFAULT_CSV_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "transjakarta_taps.csv"
+)
+DEFAULT_CSV_URL = (
+    "https://raw.githubusercontent.com/rahmadits/capstone2_transjakarta/master/Transjakarta.csv"
 )
 
 
@@ -103,10 +107,27 @@ class TapReplayProducer:
                     time.sleep(2)
         return self._producer
 
+    def ensure_dataset_available(self) -> str:
+        """Download and cache the dataset CSV if not already present."""
+        if os.path.exists(self.csv_path) and os.path.getsize(self.csv_path) > 0:
+            return self.csv_path
+
+        os.makedirs(os.path.dirname(self.csv_path), exist_ok=True)
+        logger.info("Downloading historical simulated tap dataset from %s...", DEFAULT_CSV_URL)
+        try:
+            res = requests.get(DEFAULT_CSV_URL, timeout=60)
+            res.raise_for_status()
+            with open(self.csv_path, "wb") as f:
+                f.write(res.content)
+            logger.info("Dataset downloaded successfully to %s", self.csv_path)
+            return self.csv_path
+        except Exception as exc:
+            logger.error("Failed to download dataset: %s", exc)
+            raise FileNotFoundError(f"Source dataset not found and download failed: {exc}") from exc
+
     def load_events(self) -> list[dict[str, Any]]:
         """Load and sort transactions from CSV by tapInTime."""
-        if not os.path.exists(self.csv_path):
-            raise FileNotFoundError(f"Source dataset not found at {self.csv_path}")
+        self.ensure_dataset_available()
 
         logger.info("Loading transaction dataset from %s...", self.csv_path)
         events = []

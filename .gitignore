@@ -87,7 +87,8 @@ dags/__pycache__/
 *.csv
 *.parquet
 *.jsonl
-data/
+data/*
+!data/.gitkeep
 raw_data/
 
 # OS and IDE files

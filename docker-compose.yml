@@ -6,7 +6,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-46BKJoKc-CtANjlbbbDWgrMvaJ34GWA7oAq6_qGCmTZ=}
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
-    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__CORE__SECRET_KEY:-koridortj_secret_key_1234567890abcdef}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-koridortj_secret_key_1234567890abcdef}
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     # Project specific env vars
     POSTGRES_HOST: postgres
@@ -28,14 +28,11 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: koridortj-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB_WAREHOUSE:-warehouse}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
@@ -54,17 +51,13 @@ services:
 
   kafka:
     image: apache/kafka:3.7.0
-    container_name: koridortj-kafka
     restart: unless-stopped
-    ports:
-      - "9092:9092"
-      - "9094:9094"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
@@ -88,7 +81,6 @@ services:
 
   airflow-init:
     <<: *airflow-common
-    container_name: koridortj-airflow-init
     command: >
       bash -c "
       airflow db migrate &&
@@ -97,7 +89,7 @@ services:
         --firstname Admin \
         --lastname User \
         --role Admin \
-        --email admin@example.com \
+        --email admin@koridortj.id \
         --password admin || true
       "
     depends_on:
@@ -106,11 +98,10 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    container_name: koridortj-airflow-webserver
     restart: unless-stopped
     command: webserver
     ports:
-      - "8080:8080"
+      - "${AIRFLOW_PORT:-8080}:8080"
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -127,7 +118,6 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
-    container_name: koridortj-airflow-scheduler
     restart: unless-stopped
     command: scheduler
     depends_on:
@@ -141,7 +131,6 @@ services:
 
   superset-init:
     image: apache/superset:4.0.1
-    container_name: koridortj-superset-init
     user: "0"
     environment:
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
@@ -167,7 +156,6 @@ services:
 
   superset:
     image: apache/superset:4.0.1
-    container_name: koridortj-superset
     restart: unless-stopped
     user: "0"
     environment:
@@ -182,7 +170,7 @@ services:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
       - superset_home:/app/superset_home
     ports:
-      - "8088:8088"
+      - "${SUPERSET_PORT:-8088}:8088"
     depends_on:
       superset-init:
         condition: service_completed_successfully
@@ -203,10 +191,9 @@ services:
     build:
       context: .
       dockerfile: services/guest_token_service/Dockerfile
-    container_name: koridortj-token-service
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${PORT:-8000}:8000"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
@@ -231,7 +218,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.producer
-    container_name: koridortj-replay-producer
     restart: unless-stopped
     profiles:
       - streaming
@@ -254,7 +240,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.consumer
-    container_name: koridortj-tap-consumer
     restart: unless-stopped
     profiles:
       - streaming
@@ -282,11 +267,8 @@ services:
 
 volumes:
   postgres_data:
-    name: koridortj_postgres_data
   superset_home:
-    name: koridortj_superset_home
 
 networks:
   koridortj-network:
-    name: koridortj-network
     driver: bridge

@@ -7,10 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir kafka-python-ng pydantic python-dotenv
+RUN pip install --no-cache-dir kafka-python-ng pydantic python-dotenv requests
 
+RUN mkdir -p /app/data
 COPY ingestion /app/ingestion
-COPY data /app/data
 
 ENV PYTHONPATH=/app
 ENV KAFKA_BOOTSTRAP_SERVERS=kafka:9092
