@@ -30,6 +30,7 @@ x-airflow-common: &airflow-common
     - ./ingestion:/opt/airflow/ingestion
     - ./dbt:/opt/airflow/dbt
     - ./data:/opt/airflow/data
+    - ./scripts:/opt/airflow/scripts
   logging:
     driver: "json-file"
     options:
@@ -50,7 +51,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB_WAREHOUSE:-warehouse}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB_WAREHOUSE:-warehouse} || pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -113,7 +114,11 @@ services:
     <<: *airflow-common
     command: >
       bash -c "
+      echo '=== Bootstrapping PostgreSQL Databases & Roles ===' &&
+      python /opt/airflow/scripts/bootstrap_postgres.py &&
+      echo '=== Migrating Airflow Database ===' &&
       airflow db migrate &&
+      echo '=== Creating Airflow Admin User ===' &&
       airflow users create \
         --username admin \
         --firstname Admin \
@@ -187,12 +192,12 @@ services:
       echo '=== Upgrading Superset DB ===' &&
       superset db upgrade &&
       echo '=== Creating Superset Admin ===' &&
-      superset fab create-admin \
-        --username $${SUPERSET_ADMIN_USERNAME:-admin} \
+      (superset fab create-admin \
+        --username \"${SUPERSET_ADMIN_USERNAME:-admin}\" \
         --firstname Admin \
         --lastname User \
-        --email $${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id} \
-        --password $${SUPERSET_ADMIN_PASSWORD:-admin} || true &&
+        --email \"${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}\" \
+        --password \"${SUPERSET_ADMIN_PASSWORD:-admin}\" || true) &&
       echo '=== Initializing Roles ===' &&
       superset init
       "
