@@ -29,10 +29,17 @@ SUPERSET_URL = os.getenv("SUPERSET_URL", "http://localhost:8088")
 SUPERSET_USER = os.getenv("SUPERSET_ADMIN_USERNAME", "admin")
 SUPERSET_PASS = os.getenv("SUPERSET_ADMIN_PASSWORD", "admin")
 
+RO_USER = os.getenv("POSTGRES_READONLY_USER", "superset_ro")
+RO_PASS = os.getenv("POSTGRES_READONLY_PASSWORD", "superset_ro_dev_password")
+PG_HOST = os.getenv("POSTGRES_HOST", "postgres")
+PG_PORT = os.getenv("POSTGRES_PORT", "5432")
+PG_DB = os.getenv("POSTGRES_DB_WAREHOUSE", "warehouse")
+
 WAREHOUSE_DB_URI = os.getenv(
     "SUPERSET_WAREHOUSE_SQLALCHEMY_URI",
-    "postgresql+psycopg2://superset_ro:superset_ro_dev_password@postgres:5432/warehouse",
+    f"postgresql+psycopg2://{RO_USER}:{RO_PASS}@{PG_HOST}:{PG_PORT}/{PG_DB}",
 )
+
 
 
 class SupersetProvisioner:
