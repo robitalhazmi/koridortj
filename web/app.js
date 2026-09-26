@@ -195,15 +195,24 @@ async function loadEmbeddedDashboard() {
           filters: { expanded: false },
         },
       });
+
+      // Ensure embedded iframe takes 100% width and full viewport height
+      const iframe = container.querySelector('iframe');
+      if (iframe) {
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.minHeight = '850px';
+        iframe.style.border = 'none';
+      }
     } else {
       // Fallback iframe if SDK script failed
       container.innerHTML = `
         <iframe
           src="${tokenData.superset_domain}/embedded/${tokenData.dashboard_id}?uiConfig=6"
           width="100%"
-          height="650"
+          height="850px"
           frameborder="0"
-          style="border: none; border-radius: 8px;">
+          style="border: none; border-radius: 8px; width: 100%; min-height: 850px; height: 85vh;">
         </iframe>
       `;
     }
@@ -217,6 +226,12 @@ async function loadEmbeddedDashboard() {
       </div>
     `;
   }
+}
+
+function toggleDashboardFullscreen() {
+  const card = document.getElementById('embed-card-container');
+  if (!card) return;
+  card.classList.toggle('fullscreen-mode');
 }
 
 // Initial load

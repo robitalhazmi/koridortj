@@ -128,13 +128,16 @@
 
     <!-- Tab 2: Embedded Superset Dashboard -->
     <div id="tab-embedded" class="tab-pane">
-      <div class="card">
+      <div class="card embed-card" id="embed-card-container">
         <div class="card-header">
           <div>
             <h3>Apache Superset Embedded Dashboard</h3>
             <p class="card-sub">Secured via short-lived JWT Guest Tokens minted by the FastAPI token service.</p>
           </div>
-          <button class="btn btn-sm" onclick="loadEmbeddedDashboard()">🔄 Refresh Session</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-sm secondary" onclick="toggleDashboardFullscreen()">⛶ Fullscreen</button>
+            <button class="btn btn-sm" onclick="loadEmbeddedDashboard()">🔄 Refresh Session</button>
+          </div>
         </div>
         <div id="dashboard-embed-container" class="embed-box">
           <div class="embed-placeholder" id="embed-loader">
