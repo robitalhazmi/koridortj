@@ -207,9 +207,15 @@ def get_live_stats():
         raise HTTPException(status_code=500, detail=f"Database query failed: {exc}")
 
 
-# Mount web directory if it exists
-web_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "web")
-if os.path.exists(web_dir):
+# Mount web directory (supports local dev repo structure, current working dir, and Docker /app/web)
+possible_paths = [
+    os.path.join(os.path.dirname(__file__), "web"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "web"),
+    os.path.join(os.getcwd(), "web"),
+    "/app/web",
+]
+web_dir = next((p for p in possible_paths if os.path.exists(p) and os.path.isdir(p)), None)
+if web_dir:
     app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 
 

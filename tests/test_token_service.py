@@ -44,3 +44,9 @@ class TestGuestTokenService:
         assert decoded["resources"][0]["type"] == "dashboard"
         assert decoded["resources"][0]["id"] == "test-dashboard-123"
         assert decoded["exp"] > decoded["iat"]
+
+    def test_web_portal_root_endpoint(self):
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers.get("content-type", "")
+        assert "KoridorTJ" in response.text
