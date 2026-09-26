@@ -14,6 +14,7 @@ import psycopg2.extras
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -219,6 +220,28 @@ possible_paths = [
     "/app/web",
 ]
 web_dir = next((p for p in possible_paths if os.path.exists(p) and os.path.isdir(p)), None)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def get_favicon_ico():
+    """Serve favicon.ico if available."""
+    if web_dir:
+        ico_path = os.path.join(web_dir, "favicon.ico")
+        if os.path.exists(ico_path):
+            return FileResponse(ico_path, media_type="image/x-icon")
+    return Response(status_code=204)
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def get_favicon_svg():
+    """Serve favicon.svg if available."""
+    if web_dir:
+        svg_path = os.path.join(web_dir, "favicon.svg")
+        if os.path.exists(svg_path):
+            return FileResponse(svg_path, media_type="image/svg+xml")
+    return Response(status_code=204)
+
+
 if web_dir:
     app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
 

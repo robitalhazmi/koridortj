@@ -55,3 +55,14 @@ class TestGuestTokenService:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         assert "KoridorTJ" in response.text
+
+    def test_favicon_endpoints(self):
+        response_ico = client.get("/favicon.ico")
+        assert response_ico.status_code in (200, 204)
+        if response_ico.status_code == 200:
+            assert "image" in response_ico.headers.get("content-type", "")
+
+        response_svg = client.get("/favicon.svg")
+        assert response_svg.status_code in (200, 204)
+        if response_svg.status_code == 200:
+            assert "image/svg+xml" in response_svg.headers.get("content-type", "")
