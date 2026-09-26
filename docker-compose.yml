@@ -20,9 +20,15 @@ x-airflow-common: &airflow-common
     # Project specific env vars
     POSTGRES_HOST: postgres
     POSTGRES_PORT: "5432"
+    POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
     POSTGRES_DB_WAREHOUSE: ${POSTGRES_DB_WAREHOUSE:-warehouse}
+    POSTGRES_DB_AIRFLOW: ${POSTGRES_DB_AIRFLOW:-airflow_meta}
+    POSTGRES_DB_SUPERSET: ${POSTGRES_DB_SUPERSET:-superset_meta}
     POSTGRES_INGESTION_USER: ${POSTGRES_INGESTION_USER:-ingestion_user}
     POSTGRES_INGESTION_PASSWORD: ${POSTGRES_INGESTION_PASSWORD:-ingestion_dev_password}
+    POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER:-superset_ro}
+    POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD:-superset_ro_dev_password}
     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     PYTHONPATH: /opt/airflow
   volumes:
@@ -119,13 +125,7 @@ services:
       echo '=== Migrating Airflow Database ===' &&
       airflow db migrate &&
       echo '=== Creating Airflow Admin User ===' &&
-      airflow users create \
-        --username admin \
-        --firstname Admin \
-        --lastname User \
-        --role Admin \
-        --email admin@koridortj.id \
-        --password admin || true
+      (airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@koridortj.id --password admin || true)
       "
     depends_on:
       postgres:
