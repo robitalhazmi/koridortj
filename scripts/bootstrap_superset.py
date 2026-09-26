@@ -41,7 +41,6 @@ WAREHOUSE_DB_URI = os.getenv(
 )
 
 
-
 class SupersetProvisioner:
     """Manages Superset API automation."""
 

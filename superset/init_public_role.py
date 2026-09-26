@@ -1,8 +1,9 @@
 """Initialize Superset Admin User & Public / Guest Role Permissions for Embedded Dashboards."""
 
 import os
-from werkzeug.security import generate_password_hash
+
 from superset.app import create_app
+from werkzeug.security import generate_password_hash
 
 app = create_app()
 with app.app_context():

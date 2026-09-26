@@ -29,9 +29,7 @@ GUEST_ROLE_NAME = "Public"
 GUEST_TOKEN_JWT_SECRET = os.getenv(
     "SUPERSET_GUEST_TOKEN_JWT_SECRET", "koridortj_guest_token_jwt_secret_abcdef123456"
 )
-GUEST_TOKEN_JWT_AUDIENCE = os.getenv(
-    "SUPERSET_GUEST_TOKEN_JWT_AUDIENCE", "koridortj-superset"
-)
+GUEST_TOKEN_JWT_AUDIENCE = os.getenv("SUPERSET_GUEST_TOKEN_JWT_AUDIENCE", "koridortj-superset")
 GUEST_TOKEN_JWT_ALGO = "HS256"
 GUEST_TOKEN_JWT_EXP_SECONDS = 3600
 
