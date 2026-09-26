@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from services.guest_token_service.main import (
     SUPERSET_JWT_ALGO,
+    SUPERSET_JWT_AUDIENCE,
     SUPERSET_JWT_SECRET,
     app,
 )
@@ -37,9 +38,11 @@ class TestGuestTokenService:
             data["token"],
             SUPERSET_JWT_SECRET,
             algorithms=[SUPERSET_JWT_ALGO],
+            audience=SUPERSET_JWT_AUDIENCE,
         )
 
         assert decoded["user"]["username"] == "public_guest"
+        assert decoded["aud"] == SUPERSET_JWT_AUDIENCE
         assert len(decoded["resources"]) == 1
         assert decoded["resources"][0]["type"] == "dashboard"
         assert decoded["resources"][0]["id"] == "test-dashboard-123"

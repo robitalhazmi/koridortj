@@ -47,6 +47,9 @@ SUPERSET_DASHBOARD_ID = os.getenv("SUPERSET_DASHBOARD_ID", "45d44fda-4e9c-4a88-8
 SUPERSET_JWT_SECRET = os.getenv(
     "SUPERSET_GUEST_TOKEN_JWT_SECRET", "koridortj_guest_token_jwt_secret_abcdef123456"
 )
+SUPERSET_JWT_AUDIENCE = os.getenv(
+    "SUPERSET_GUEST_TOKEN_JWT_AUDIENCE", "koridortj-superset"
+)
 
 SUPERSET_JWT_ALGO = "HS256"
 SUPERSET_JWT_EXP_SECONDS = 3600
@@ -118,6 +121,7 @@ def mint_guest_token(dashboard_id: str | None = None):
         "rls": [],
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
+        "aud": SUPERSET_JWT_AUDIENCE,
     }
 
     try:

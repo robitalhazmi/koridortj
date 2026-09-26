@@ -176,6 +176,8 @@ services:
     environment:
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-koridortj_superset_secret_key_9876543210abcdef}
+      SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+      SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
       POSTGRES_HOST: postgres
@@ -186,21 +188,18 @@ services:
       SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}
     volumes:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/init_public_role.py:/app/pythonpath/init_public_role.py:ro
       - superset_home:/app/superset_home
     command: >
       bash -c "
       echo '=== Upgrading Superset DB ===' &&
       superset db upgrade &&
-      echo '=== Creating Superset Admin ===' &&
-      (superset fab create-admin \
-        --username \"${SUPERSET_ADMIN_USERNAME:-admin}\" \
-        --firstname Admin \
-        --lastname User \
-        --email \"${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}\" \
-        --password \"${SUPERSET_ADMIN_PASSWORD:-admin}\" || true) &&
       echo '=== Initializing Roles ===' &&
-      superset init
+      superset init &&
+      echo '=== Configuring Admin & Public/Guest Roles ===' &&
+      python /app/pythonpath/init_public_role.py
       "
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -226,6 +225,8 @@ services:
     environment:
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-koridortj_superset_secret_key_9876543210abcdef}
+      SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+      SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
       POSTGRES_HOST: postgres
@@ -237,6 +238,7 @@ services:
       SUPERSET_WEBSERVER_THREADS: "4"
     volumes:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/init_public_role.py:/app/pythonpath/init_public_role.py:ro
       - superset_home:/app/superset_home
     ports:
       - "${SUPERSET_PORT:-8088}:8088"
@@ -279,6 +281,7 @@ services:
       SUPERSET_DOMAIN: ${SUPERSET_DOMAIN:-http://localhost:8088}
       SUPERSET_DASHBOARD_ID: ${SUPERSET_DASHBOARD_ID:-45d44fda-4e9c-4a88-894d-819f66fbfd33}
       SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+      SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
     depends_on:
       postgres:
         condition: service_healthy

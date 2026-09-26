@@ -249,7 +249,7 @@ class SupersetProvisioner:
                 "Existing embedded dashboard configuration found (Embedded UUID: %s)", embedded_uuid
             )
         else:
-            post_embed = self.session.post(embed_url, json={"allowed_domains": ["*"]}, timeout=10)
+            post_embed = self.session.post(embed_url, json={"allowed_domains": []}, timeout=10)
             if post_embed.status_code in (200, 201):
                 embedded_uuid = post_embed.json().get("result", {}).get("uuid")
                 logger.info(
