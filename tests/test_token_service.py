@@ -43,6 +43,8 @@ class TestGuestTokenService:
 
         assert decoded["user"]["username"] == "public_guest"
         assert decoded["aud"] == SUPERSET_JWT_AUDIENCE
+        assert decoded["type"] == "guest"
+        assert decoded["rls_rules"] == []
         assert len(decoded["resources"]) == 1
         assert decoded["resources"][0]["type"] == "dashboard"
         assert decoded["resources"][0]["id"] == "test-dashboard-123"

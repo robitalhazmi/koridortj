@@ -116,10 +116,12 @@ def mint_guest_token(dashboard_id: str | None = None):
                 "id": target_dashboard,
             }
         ],
+        "rls_rules": [],
         "rls": [],
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
         "aud": SUPERSET_JWT_AUDIENCE,
+        "type": "guest",
     }
 
     try:
