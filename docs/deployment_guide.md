@@ -132,3 +132,21 @@ docker compose exec -T postgres pg_restore -U postgres -d warehouse --clean < ba
 ```bash
 docker compose logs -f replay-producer tap-consumer
 ```
+
+---
+
+## 5. Low-Resource & CPU Tuning for Shared VPS
+
+When hosting on a multi-tenant VPS alongside other services:
+
+1. **Airflow File Parsing Frequency**:
+   - `AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL=300` (5 minutes) and `AIRFLOW__SCHEDULER__PARSING_PROCESSES=1` prevent continuous scheduler CPU churn.
+2. **Superset Concurrency**:
+   - `SUPERSET_WORKERS=1` and `WEB_CONCURRENCY=1` reduce Gunicorn worker memory and idle polling.
+3. **Kafka Thread Limits**:
+   - `KAFKA_NUM_NETWORK_THREADS=2` and `KAFKA_NUM_IO_THREADS=2` limit JVM background worker threads.
+4. **Relaxed Docker Healthchecks**:
+   - Healthchecks run every 30s instead of every 5s to eliminate subshell spawning overhead.
+5. **Streaming on Demand**:
+   - Replay producer and consumer use `profiles: [streaming]` and only run when actively launched.
+
