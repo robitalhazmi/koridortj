@@ -195,15 +195,6 @@ async function loadEmbeddedDashboard() {
           filters: { expanded: false },
         },
       });
-
-      // Ensure embedded iframe takes 100% width and full viewport height
-      const iframe = container.querySelector('iframe');
-      if (iframe) {
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.minHeight = '850px';
-        iframe.style.border = 'none';
-      }
     } else {
       // Fallback iframe if SDK script failed
       container.innerHTML = `
