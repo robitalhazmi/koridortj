@@ -40,3 +40,28 @@ CORS_OPTIONS = {
     "resources": ["*"],
     "origins": ["*"],
 }
+
+
+# Sanitize legacy non-standard vendor CSS properties in bundled Flask-AppBuilder assets
+def _sanitize_fab_static_assets():
+    try:
+        import flask_appbuilder
+
+        fab_dir = os.path.dirname(flask_appbuilder.__file__)
+        fa_css = os.path.join(
+            fab_dir, "static", "appbuilder", "css", "fontawesome", "fontawesome.min.css"
+        )
+        if os.path.exists(fa_css):
+            with open(fa_css, encoding="utf-8") as f:
+                content = f.read()
+            if "-moz-osx-font-smoothing" in content:
+                cleaned = content.replace("-moz-osx-font-smoothing:grayscale;", "").replace(
+                    "-moz-osx-font-smoothing: grayscale;", ""
+                )
+                with open(fa_css, "w", encoding="utf-8") as f:
+                    f.write(cleaned)
+    except Exception:
+        pass
+
+
+_sanitize_fab_static_assets()
