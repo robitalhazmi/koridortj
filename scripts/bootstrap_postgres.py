@@ -88,7 +88,8 @@ def bootstrap_warehouse_objects():
         print(f" + Creating role '{ingestion_user}'...")
         cur.execute(f"CREATE ROLE {ingestion_user} WITH LOGIN PASSWORD '{ingestion_pass}';")
     else:
-        print(f" - Role '{ingestion_user}' exists.")
+        print(f" - Updating password for role '{ingestion_user}'...")
+        cur.execute(f"ALTER ROLE {ingestion_user} WITH PASSWORD '{ingestion_pass}';")
 
     cur.execute(f'GRANT ALL PRIVILEGES ON DATABASE "{warehouse_db}" TO {ingestion_user};')
     cur.execute(f"GRANT ALL ON SCHEMA raw, staging, warehouse TO {ingestion_user};")
@@ -102,7 +103,8 @@ def bootstrap_warehouse_objects():
         print(f" + Creating role '{readonly_user}'...")
         cur.execute(f"CREATE ROLE {readonly_user} WITH LOGIN PASSWORD '{readonly_pass}';")
     else:
-        print(f" - Role '{readonly_user}' exists.")
+        print(f" - Updating password for role '{readonly_user}'...")
+        cur.execute(f"ALTER ROLE {readonly_user} WITH PASSWORD '{readonly_pass}';")
 
     cur.execute(f'GRANT CONNECT ON DATABASE "{warehouse_db}" TO {readonly_user};')
     cur.execute(f"GRANT USAGE ON SCHEMA staging, warehouse TO {readonly_user};")
