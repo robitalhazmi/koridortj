@@ -1,5 +1,8 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.airflow
+  image: koridortj-airflow:latest
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_dev_password}@postgres:5432/${POSTGRES_DB_AIRFLOW:-airflow_meta}
@@ -22,7 +25,6 @@ x-airflow-common: &airflow-common
     POSTGRES_INGESTION_PASSWORD: ${POSTGRES_INGESTION_PASSWORD:-ingestion_dev_password}
     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     PYTHONPATH: /opt/airflow
-    _PIP_ADDITIONAL_REQUIREMENTS: "dbt-core>=1.8.0 dbt-postgres>=1.8.0 pydantic>=2.7.0 requests>=2.32.0 python-dotenv>=1.0.1 kafka-python-ng>=2.2.0"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./ingestion:/opt/airflow/ingestion
@@ -246,6 +248,7 @@ services:
     build:
       context: .
       dockerfile: services/guest_token_service/Dockerfile
+    image: koridortj-token-service:latest
     restart: unless-stopped
     ports:
       - "${PORT:-8005}:8000"
@@ -278,6 +281,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.producer
+    image: koridortj-replay-producer:latest
     restart: unless-stopped
     profiles:
       - streaming
@@ -305,6 +309,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.consumer
+    image: koridortj-tap-consumer:latest
     restart: unless-stopped
     profiles:
       - streaming

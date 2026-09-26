@@ -77,6 +77,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # 4. Custom Airflow Image (with dbt pre-installed)
+      - name: Build and Push Custom Airflow
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.airflow
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-airflow:latest
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-airflow:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy-coolify:
     name: Trigger Coolify Zero-Downtime Deployment
     runs-on: ubuntu-latest
