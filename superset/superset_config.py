@@ -45,21 +45,41 @@ CORS_OPTIONS = {
 # Sanitize legacy non-standard vendor CSS properties in bundled Flask-AppBuilder assets
 def _sanitize_fab_static_assets():
     try:
+        import glob
+        import re
+
         import flask_appbuilder
 
         fab_dir = os.path.dirname(flask_appbuilder.__file__)
-        fa_css = os.path.join(
-            fab_dir, "static", "appbuilder", "css", "fontawesome", "fontawesome.min.css"
-        )
-        if os.path.exists(fa_css):
-            with open(fa_css, encoding="utf-8") as f:
-                content = f.read()
-            if "-moz-osx-font-smoothing" in content:
-                cleaned = content.replace("-moz-osx-font-smoothing:grayscale;", "").replace(
-                    "-moz-osx-font-smoothing: grayscale;", ""
-                )
-                with open(fa_css, "w", encoding="utf-8") as f:
-                    f.write(cleaned)
+        css_files = glob.glob(os.path.join(fab_dir, "static", "**", "*.css"), recursive=True)
+
+        patterns = [
+            re.compile(r"filter:\s*alpha\([^)]*\);?", re.IGNORECASE),
+            re.compile(r"filter:\s*progid:DXImageTransform\.Microsoft\.[^;}]*;?", re.IGNORECASE),
+            re.compile(
+                r"filter:\s*['\"][^'\"]*alpha\([^'\"]*['\"];?",
+                re.IGNORECASE,
+            ),
+            re.compile(
+                r"filter:\s*['\"][^'\"]*DXImageTransform[^'\"]*['\"];?",
+                re.IGNORECASE,
+            ),
+            re.compile(r"-ms-filter:\s*['\"][^'\"]*['\"];?", re.IGNORECASE),
+            re.compile(r"-moz-osx-font-smoothing:\s*[^;}]*;?", re.IGNORECASE),
+        ]
+
+        for f in css_files:
+            try:
+                with open(f, encoding="utf-8", errors="ignore") as fp:
+                    original = fp.read()
+                modified = original
+                for pat in patterns:
+                    modified = pat.sub("", modified)
+                if modified != original:
+                    with open(f, "w", encoding="utf-8") as fp:
+                        fp.write(modified)
+            except Exception:
+                continue
     except Exception:
         pass
 
