@@ -88,6 +88,8 @@ def _sanitize_fab_static_assets():
             re.compile(r"@-ms-viewport\s*\{[^}]*\}", re.IGNORECASE),
             re.compile(r"-webkit-text-size-adjust:\s*100%;?", re.IGNORECASE),
             re.compile(r"-ms-text-size-adjust:\s*100%;?", re.IGNORECASE),
+            re.compile(r"[^{};]*:?-moz-focus-inner\s*\{[^}]*\}", re.IGNORECASE),
+            re.compile(r"[^{};]*:?-moz-focusring\s*\{[^}]*\}", re.IGNORECASE),
         ]
 
         for f in set(css_files):
