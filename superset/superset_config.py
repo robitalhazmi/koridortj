@@ -66,6 +66,8 @@ def _sanitize_fab_static_assets():
             ),
             re.compile(r"-ms-filter:\s*['\"][^'\"]*['\"];?", re.IGNORECASE),
             re.compile(r"-moz-osx-font-smoothing:\s*[^;}]*;?", re.IGNORECASE),
+            re.compile(r"[^{};]*:?-ms-input-placeholder\s*\{[^}]*\}", re.IGNORECASE),
+            re.compile(r"@-ms-viewport\s*\{[^}]*\}", re.IGNORECASE),
         ]
 
         for f in css_files:
