@@ -42,7 +42,7 @@ CORS_OPTIONS = {
 }
 
 
-# Sanitize legacy non-standard vendor CSS properties in bundled Flask-AppBuilder assets
+# Sanitize legacy non-standard vendor CSS properties in bundled static assets
 def _sanitize_fab_static_assets():
     try:
         import glob
@@ -50,8 +50,26 @@ def _sanitize_fab_static_assets():
 
         import flask_appbuilder
 
+        css_files = []
         fab_dir = os.path.dirname(flask_appbuilder.__file__)
-        css_files = glob.glob(os.path.join(fab_dir, "static", "**", "*.css"), recursive=True)
+        css_files.extend(glob.glob(os.path.join(fab_dir, "static", "**", "*.css"), recursive=True))
+
+        for static_dir in [
+            "/app/superset/static",
+            os.path.join(os.path.dirname(__file__), "static"),
+        ]:
+            if os.path.exists(static_dir):
+                css_files.extend(glob.glob(os.path.join(static_dir, "**", "*.css"), recursive=True))
+
+        try:
+            import superset
+
+            superset_dir = os.path.dirname(superset.__file__)
+            css_files.extend(
+                glob.glob(os.path.join(superset_dir, "static", "**", "*.css"), recursive=True)
+            )
+        except Exception:
+            pass
 
         patterns = [
             re.compile(r"filter:\s*alpha\([^)]*\);?", re.IGNORECASE),
@@ -68,9 +86,11 @@ def _sanitize_fab_static_assets():
             re.compile(r"-moz-osx-font-smoothing:\s*[^;}]*;?", re.IGNORECASE),
             re.compile(r"[^{};]*:?-ms-input-placeholder\s*\{[^}]*\}", re.IGNORECASE),
             re.compile(r"@-ms-viewport\s*\{[^}]*\}", re.IGNORECASE),
+            re.compile(r"-webkit-text-size-adjust:\s*100%;?", re.IGNORECASE),
+            re.compile(r"-ms-text-size-adjust:\s*100%;?", re.IGNORECASE),
         ]
 
-        for f in css_files:
+        for f in set(css_files):
             try:
                 with open(f, encoding="utf-8", errors="ignore") as fp:
                     original = fp.read()
