@@ -93,6 +93,7 @@ def _sanitize_fab_static_assets():
             re.compile(r"orphans:\s*[^;}]*;?", re.IGNORECASE),
             re.compile(r"widows:\s*[^;}]*;?", re.IGNORECASE),
             re.compile(r"outline:\s*[^;}]*-webkit-focus-ring-color;?", re.IGNORECASE),
+            re.compile(r"[^{};]*:?-ms-expand\s*\{[^}]*\}", re.IGNORECASE),
         ]
 
         for f in set(css_files):
