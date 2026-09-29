@@ -94,6 +94,7 @@ def _sanitize_fab_static_assets():
             re.compile(r"widows:\s*[^;}]*;?", re.IGNORECASE),
             re.compile(r"outline:\s*[^;}]*-webkit-focus-ring-color;?", re.IGNORECASE),
             re.compile(r"[^{};]*:?-ms-expand\s*\{[^}]*\}", re.IGNORECASE),
+            re.compile(r"[^{};]*:?-ms-(?:clear|reveal)\s*\{[^}]*\}", re.IGNORECASE),
             re.compile(r"[a-z0-9-]+:\s*[^;}]*\\9\s*;?", re.IGNORECASE),
         ]
 
