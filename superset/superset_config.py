@@ -102,6 +102,10 @@ def _sanitize_fab_static_assets():
                 re.compile(r"background-color:\s*none\b", re.IGNORECASE),
                 "background-color: transparent",
             ),
+            (
+                re.compile(r"@media\s*[^{};]*transform-3d[^{};]*", re.IGNORECASE),
+                "@media all",
+            ),
         ]
 
         for f in set(css_files):
