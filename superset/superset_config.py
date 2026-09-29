@@ -106,6 +106,14 @@ def _sanitize_fab_static_assets():
                 re.compile(r"@media\s*[^{};]*transform-3d[^{};]*", re.IGNORECASE),
                 "@media all",
             ),
+            (
+                re.compile(r"padding-top:\s*8(?=\s*[;}])", re.IGNORECASE),
+                "padding-top:8px",
+            ),
+            (
+                re.compile(r"padding-right:\s*2(?=\s*[;}])", re.IGNORECASE),
+                "padding-right:2px",
+            ),
         ]
 
         for f in set(css_files):
