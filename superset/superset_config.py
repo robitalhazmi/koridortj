@@ -97,6 +97,13 @@ def _sanitize_fab_static_assets():
             re.compile(r"[a-z0-9-]+:\s*[^;}]*\\9\s*;?", re.IGNORECASE),
         ]
 
+        replacements = [
+            (
+                re.compile(r"background-color:\s*none\b", re.IGNORECASE),
+                "background-color: transparent",
+            ),
+        ]
+
         for f in set(css_files):
             try:
                 with open(f, encoding="utf-8", errors="ignore") as fp:
@@ -104,6 +111,8 @@ def _sanitize_fab_static_assets():
                 modified = original
                 for pat in patterns:
                     modified = pat.sub("", modified)
+                for pat, repl in replacements:
+                    modified = pat.sub(repl, modified)
                 if modified != original:
                     with open(f, "w", encoding="utf-8") as fp:
                         fp.write(modified)
