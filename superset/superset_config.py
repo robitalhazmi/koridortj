@@ -265,6 +265,14 @@ def _sanitize_fab_static_assets():
                 ),
                 "void 0",
             ),
+            (
+                "You are using a whole package of antd",
+                re.compile(
+                    r"console\.warn\([\'\"][^\'\"]*You are using a whole package of antd[^\'\"]*[\'\"]\)",
+                    re.IGNORECASE,
+                ),
+                "void 0",
+            ),
         ]
 
         for f in set(js_files):
