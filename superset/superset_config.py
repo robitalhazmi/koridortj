@@ -257,6 +257,14 @@ def _sanitize_fab_static_assets():
                 ),
                 "void 0",
             ),
+            (
+                "Duplicate translation key",
+                re.compile(
+                    r"[a-zA-Z0-9_$.]+\.warn\((?:`[^`]*Duplicate translation key[^`]*`|['\"][^'\"]*Duplicate translation key[^'\"]*['\"])\)",
+                    re.IGNORECASE,
+                ),
+                "void 0",
+            ),
         ]
 
         for f in set(js_files):
