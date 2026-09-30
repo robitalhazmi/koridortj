@@ -100,6 +100,11 @@ def _sanitize_fab_static_assets():
                 re.compile(r"padding-right:\s*2(?=\s*[;}])", re.IGNORECASE),
                 "padding-right:2px",
             ),
+            (
+                "box-shadow:",
+                re.compile(r"(?<![-\w])box-shadow\s*:\s*0(?:px)?(?=\s*[;}])", re.IGNORECASE),
+                "box-shadow: none",
+            ),
         ]
 
         guarded_patterns = [
