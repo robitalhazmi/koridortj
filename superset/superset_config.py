@@ -105,6 +105,16 @@ def _sanitize_fab_static_assets():
                 re.compile(r"(?<![-\w])box-shadow\s*:\s*0(?:px)?(?=\s*[;}])", re.IGNORECASE),
                 "box-shadow: none",
             ),
+            (
+                "max-width:",
+                re.compile(r"(?<![-\w])max-width\s*:\s*auto\b", re.IGNORECASE),
+                "max-width: none",
+            ),
+            (
+                "max-height:",
+                re.compile(r"(?<![-\w])max-height\s*:\s*auto\b", re.IGNORECASE),
+                "max-height: none",
+            ),
         ]
 
         guarded_patterns = [
