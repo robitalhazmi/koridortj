@@ -108,14 +108,20 @@ class SupersetProvisioner:
         if res.status_code == 200:
             for db in res.json().get("result", []):
                 if db.get("database_name") == "KoridorTJ Warehouse":
-                    logger.info("Found existing database connection (ID: %s)", db.get("id"))
-                    return db.get("id")
+                    db_id = db.get("id")
+                    logger.info("Found existing database connection (ID: %s)", db_id)
+                    self.session.put(
+                        f"{url}{db_id}",
+                        json={"expose_in_sqllab": True, "allow_run_async": False},
+                        timeout=10,
+                    )
+                    return db_id
 
         payload = {
             "database_name": "KoridorTJ Warehouse",
             "sqlalchemy_uri": WAREHOUSE_DB_URI,
             "expose_in_sqllab": True,
-            "allow_run_async": True,
+            "allow_run_async": False,
             "allow_ctas": False,
             "allow_cvas": False,
             "allow_dml": False,

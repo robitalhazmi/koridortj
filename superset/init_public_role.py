@@ -57,13 +57,34 @@ with app.app_context():
         if pvm and pub:
             security_manager.add_permission_role(pub, pvm)
 
-    # 3. Ensure Embedded Dashboards Allow Embedding from Any Origin
+    # 3. Ensure all databases allow synchronous execution in SQL Lab without Celery
+    from superset.models.core import Database
+
+    for d in security_manager.get_session.query(Database).all():
+        d.allow_run_async = False
+        d.expose_in_sqllab = True
+        security_manager.get_session.merge(d)
+
+    # 4. Ensure Embedded Dashboards Allow Embedding from Any Origin
     from superset.models.embedded_dashboard import EmbeddedDashboard
 
     for ed in security_manager.get_session.query(EmbeddedDashboard).all():
         if ed.allow_domain_list == "*" or ed.allow_domain_list == "['*']":
             ed.allow_domain_list = None
             security_manager.get_session.merge(ed)
+
+    # 5. Ensure SQL Lab query table column lengths accommodate client IDs
+    try:
+        from sqlalchemy import text
+
+        security_manager.get_session.execute(
+            text("ALTER TABLE query ALTER COLUMN client_id TYPE VARCHAR(64);")
+        )
+        security_manager.get_session.execute(
+            text("ALTER TABLE tab_state ALTER COLUMN latest_query_id TYPE VARCHAR(64);")
+        )
+    except Exception:
+        pass
 
     security_manager.get_session.commit()
     print(f"✅ Public role configured with {len(pub.permissions)} permissions.")
