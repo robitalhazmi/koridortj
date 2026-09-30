@@ -76,6 +76,11 @@ def _sanitize_fab_static_assets():
                 "line-height:1.5715;",
             ),
             (
+                "line-",
+                re.compile(r"(?<![-\w])line-(?=[;}])", re.IGNORECASE),
+                "line-height:1.5715;",
+            ),
+            (
                 "background-color:",
                 re.compile(r"background-color:\s*none\b", re.IGNORECASE),
                 "background-color: transparent",
