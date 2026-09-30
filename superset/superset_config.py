@@ -99,6 +99,8 @@ def _sanitize_fab_static_assets():
             re.compile(r",\s*[^{};]*_?:-ms-fullscreen[^{};]*(?=\s*\{)", re.IGNORECASE),
             re.compile(r"[^{};]*_?:-ms-fullscreen[^{};]*\{[^}]*\}", re.IGNORECASE),
             re.compile(r"[a-z0-9-]+:\s*[^;}]*\\9\s*;?", re.IGNORECASE),
+            re.compile(r"height:\s*1\.5715\s*;?", re.IGNORECASE),
+            re.compile(r"max-height:\s*-[0-9]+(?:px|em|rem|%)?\s*;?", re.IGNORECASE),
         ]
 
         replacements = [
@@ -124,10 +126,15 @@ def _sanitize_fab_static_assets():
 
         for f in set(css_files):
             try:
+                if not f.endswith(".css"):
+                    continue
                 with open(f, encoding="utf-8", errors="ignore") as fp:
                     original = fp.read()
                 modified = original
+
                 for feature in media_feature_removals:
+                    if feature not in modified:
+                        continue
                     while True:
                         m = re.search(
                             rf"@media[^{{}}]*{re.escape(feature)}[^{{}}]*\{{",
@@ -137,21 +144,29 @@ def _sanitize_fab_static_assets():
                         if not m:
                             break
                         start = m.start()
-                        brace_count = 0
-                        end = len(modified)
-                        for i in range(m.end() - 1, len(modified)):
-                            if modified[i] == "{":
+                        open_pos = m.end() - 1
+                        brace_count = 1
+                        curr = open_pos + 1
+                        n = len(modified)
+                        while curr < n and brace_count > 0:
+                            next_open = modified.find("{", curr)
+                            next_close = modified.find("}", curr)
+                            if next_close == -1:
+                                curr = n
+                                break
+                            if next_open != -1 and next_open < next_close:
                                 brace_count += 1
-                            elif modified[i] == "}":
+                                curr = next_open + 1
+                            else:
                                 brace_count -= 1
-                                if brace_count == 0:
-                                    end = i + 1
-                                    break
-                        modified = modified[:start] + modified[end:]
+                                curr = next_close + 1
+                        modified = modified[:start] + modified[curr:]
+
                 for pat in patterns:
                     modified = pat.sub("", modified)
                 for pat, repl in replacements:
                     modified = pat.sub(repl, modified)
+
                 if modified != original:
                     with open(f, "w", encoding="utf-8") as fp:
                         fp.write(modified)
