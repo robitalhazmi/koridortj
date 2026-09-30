@@ -50,6 +50,7 @@ def _sanitize_fab_static_assets():
         import sys
 
         css_files = []
+        js_files = []
         candidate_dirs = [
             "/app/superset/static",
             os.path.join(os.path.dirname(__file__), "static"),
@@ -65,6 +66,7 @@ def _sanitize_fab_static_assets():
         for static_dir in set(candidate_dirs):
             if os.path.exists(static_dir):
                 css_files.extend(glob.glob(os.path.join(static_dir, "**", "*.css"), recursive=True))
+                js_files.extend(glob.glob(os.path.join(static_dir, "**", "*.js"), recursive=True))
 
         guarded_replacements = [
             (
@@ -240,6 +242,33 @@ def _sanitize_fab_static_assets():
                     if kw.lower() in modified.lower():
                         modified = pat.sub("", modified)
 
+                if modified != original:
+                    with open(f, "w", encoding="utf-8") as fp:
+                        fp.write(modified)
+            except Exception:
+                continue
+
+        js_replacements = [
+            (
+                "You should call configure",
+                re.compile(
+                    r"console\.warn\([\'\"][^\'\"]*You should call configure[^\'\"]*[\'\"]\)",
+                    re.IGNORECASE,
+                ),
+                "void 0",
+            ),
+        ]
+
+        for f in set(js_files):
+            try:
+                if not f.endswith(".js"):
+                    continue
+                with open(f, encoding="utf-8", errors="ignore") as fp:
+                    original = fp.read()
+                modified = original
+                for kw, pat, repl in js_replacements:
+                    if kw in modified:
+                        modified = pat.sub(repl, modified)
                 if modified != original:
                     with open(f, "w", encoding="utf-8") as fp:
                         fp.write(modified)
