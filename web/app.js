@@ -169,17 +169,27 @@ function renderFallbackData() {
   ]);
 }
 
+let isDashboardLoaded = false;
+
 // Superset Embedded SDK Loader
-async function loadEmbeddedDashboard() {
+async function loadEmbeddedDashboard(force = false) {
   const container = document.getElementById('dashboard-embed-container');
-  const loader = document.getElementById('embed-loader');
+  if (!container) return;
+
+  if (isDashboardLoaded && !force && container.querySelector('iframe')) {
+    return;
+  }
+
+  const targetLabel = document.getElementById('superset-target-label');
 
   try {
     const tokenRes = await fetch('/api/guest-token');
     if (!tokenRes.ok) throw new Error(`Token endpoint returned ${tokenRes.status}`);
     const tokenData = await tokenRes.json();
 
-    document.getElementById('superset-target-label').textContent = tokenData.superset_domain;
+    if (targetLabel) {
+      targetLabel.textContent = tokenData.superset_domain;
+    }
 
     if (window.supersetEmbeddedSdk) {
       container.innerHTML = '';
@@ -195,6 +205,7 @@ async function loadEmbeddedDashboard() {
           filters: { expanded: false },
         },
       });
+      isDashboardLoaded = true;
     } else {
       // Fallback iframe if SDK script failed
       container.innerHTML = `
@@ -206,8 +217,10 @@ async function loadEmbeddedDashboard() {
           style="border: none; border-radius: 8px; width: 100%; min-height: 850px; height: 85vh;">
         </iframe>
       `;
+      isDashboardLoaded = true;
     }
   } catch (err) {
+    isDashboardLoaded = false;
     console.warn('Superset direct embed not available yet; showing fallback message:', err);
     container.innerHTML = `
       <div class="embed-placeholder">
