@@ -250,6 +250,11 @@ def _sanitize_fab_static_assets():
 
         js_replacements = [
             (
+                "-moz-osx",
+                re.compile(r"-moz-osx-font-smoothing:\s*[^;}\\'\"]*;?", re.IGNORECASE),
+                "",
+            ),
+            (
                 "You should call configure",
                 re.compile(
                     r"console\.warn\([\'\"][^\'\"]*You should call configure[^\'\"]*[\'\"]\)",
