@@ -47,78 +47,121 @@ def _sanitize_fab_static_assets():
     try:
         import glob
         import re
-
-        import flask_appbuilder
+        import sys
 
         css_files = []
-        fab_dir = os.path.dirname(flask_appbuilder.__file__)
-        css_files.extend(glob.glob(os.path.join(fab_dir, "static", "**", "*.css"), recursive=True))
-
-        for static_dir in [
+        candidate_dirs = [
             "/app/superset/static",
             os.path.join(os.path.dirname(__file__), "static"),
-        ]:
+        ]
+        if "flask_appbuilder" in sys.modules:
+            candidate_dirs.append(
+                os.path.join(os.path.dirname(sys.modules["flask_appbuilder"].__file__), "static")
+            )
+        candidate_dirs.extend(
+            glob.glob("/usr/local/lib/python*/site-packages/flask_appbuilder/static")
+        )
+
+        for static_dir in set(candidate_dirs):
             if os.path.exists(static_dir):
                 css_files.extend(glob.glob(os.path.join(static_dir, "**", "*.css"), recursive=True))
 
-        try:
-            import superset
-
-            superset_dir = os.path.dirname(superset.__file__)
-            css_files.extend(
-                glob.glob(os.path.join(superset_dir, "static", "**", "*.css"), recursive=True)
-            )
-        except Exception:
-            pass
-
-        patterns = [
-            re.compile(r"filter:\s*alpha\([^)]*\);?", re.IGNORECASE),
-            re.compile(r"filter:\s*progid:DXImageTransform\.Microsoft\.[^;}]*;?", re.IGNORECASE),
-            re.compile(
-                r"filter:\s*['\"][^'\"]*alpha\([^'\"]*['\"];?",
-                re.IGNORECASE,
-            ),
-            re.compile(
-                r"filter:\s*['\"][^'\"]*DXImageTransform[^'\"]*['\"];?",
-                re.IGNORECASE,
-            ),
-            re.compile(r"-ms-filter:\s*['\"][^'\"]*['\"];?", re.IGNORECASE),
-            re.compile(r"-moz-osx-font-smoothing:\s*[^;}]*;?", re.IGNORECASE),
-            re.compile(r"[^{};]*:?-ms-input-placeholder\s*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"@-ms-viewport\s*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"-webkit-text-size-adjust:\s*100%;?", re.IGNORECASE),
-            re.compile(r"-ms-text-size-adjust:\s*100%;?", re.IGNORECASE),
-            re.compile(r"[^{};]*:?-moz-focus-inner\s*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"[^{};]*:?-moz-focusring\s*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"orphans:\s*[^;}]*;?", re.IGNORECASE),
-            re.compile(r"widows:\s*[^;}]*;?", re.IGNORECASE),
-            re.compile(r"outline:\s*[^;}]*-webkit-focus-ring-color;?", re.IGNORECASE),
-            re.compile(r"[^{};]*:?-ms-expand\s*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"[^{};]*:?-ms-(?:clear|reveal)\s*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"[^{};]*_?:-ms-fullscreen[^{};]*,\s*", re.IGNORECASE),
-            re.compile(r",\s*[^{};]*_?:-ms-fullscreen[^{};]*(?=\s*\{)", re.IGNORECASE),
-            re.compile(r"[^{};]*_?:-ms-fullscreen[^{};]*\{[^}]*\}", re.IGNORECASE),
-            re.compile(r"[a-z0-9-]+:\s*[^;}]*\\9\s*;?", re.IGNORECASE),
-            re.compile(r"height:\s*1\.5715\s*;?", re.IGNORECASE),
-            re.compile(r"max-height:\s*-[0-9]+(?:px|em|rem|%)?\s*;?", re.IGNORECASE),
-        ]
-
-        replacements = [
+        guarded_replacements = [
             (
+                "line-",
+                re.compile(
+                    r"(?<![-\w])line-(?=(?:list-style|padding|margin|overflow|text-align|min-width|max-width|min-height|line-height|font-size|border)\b)",
+                    re.IGNORECASE,
+                ),
+                "line-height:1.5715;",
+            ),
+            (
+                "background-color:",
                 re.compile(r"background-color:\s*none\b", re.IGNORECASE),
                 "background-color: transparent",
             ),
             (
+                "transform-3d",
                 re.compile(r"@media\s*[^{};]*transform-3d[^{};]*", re.IGNORECASE),
                 "@media all",
             ),
             (
+                "padding-top:",
                 re.compile(r"padding-top:\s*8(?=\s*[;}])", re.IGNORECASE),
                 "padding-top:8px",
             ),
             (
+                "padding-right:",
                 re.compile(r"padding-right:\s*2(?=\s*[;}])", re.IGNORECASE),
                 "padding-right:2px",
+            ),
+        ]
+
+        guarded_patterns = [
+            ("alpha", re.compile(r"filter:\s*alpha\([^)]*\);?", re.IGNORECASE)),
+            (
+                "DXImageTransform",
+                re.compile(
+                    r"filter:\s*progid:DXImageTransform\.Microsoft\.[^;}]*;?", re.IGNORECASE
+                ),
+            ),
+            (
+                "alpha",
+                re.compile(
+                    r"filter:\s*['\"][^'\"]*alpha\([^'\"]*['\"];?",
+                    re.IGNORECASE,
+                ),
+            ),
+            (
+                "DXImageTransform",
+                re.compile(
+                    r"filter:\s*['\"][^'\"]*DXImageTransform[^'\"]*['\"];?",
+                    re.IGNORECASE,
+                ),
+            ),
+            ("-ms-filter", re.compile(r"-ms-filter:\s*['\"][^'\"]*['\"];?", re.IGNORECASE)),
+            ("-moz-osx", re.compile(r"-moz-osx-font-smoothing:\s*[^;}]*;?", re.IGNORECASE)),
+            (
+                "-ms-input-placeholder",
+                re.compile(r"[^{};]*:?-ms-input-placeholder\s*\{[^}]*\}", re.IGNORECASE),
+            ),
+            ("@-ms-viewport", re.compile(r"@-ms-viewport\s*\{[^}]*\}", re.IGNORECASE)),
+            (
+                "-webkit-text-size-adjust",
+                re.compile(r"-webkit-text-size-adjust:\s*100%;?", re.IGNORECASE),
+            ),
+            ("-ms-text-size-adjust", re.compile(r"-ms-text-size-adjust:\s*100%;?", re.IGNORECASE)),
+            (
+                "-moz-focus-inner",
+                re.compile(r"[^{};]*:?-moz-focus-inner\s*\{[^}]*\}", re.IGNORECASE),
+            ),
+            ("-moz-focusring", re.compile(r"[^{};]*:?-moz-focusring\s*\{[^}]*\}", re.IGNORECASE)),
+            ("orphans", re.compile(r"orphans:\s*[^;}]*;?", re.IGNORECASE)),
+            ("widows", re.compile(r"widows:\s*[^;}]*;?", re.IGNORECASE)),
+            (
+                "-webkit-focus-ring-color",
+                re.compile(r"outline:\s*[^;}]*-webkit-focus-ring-color;?", re.IGNORECASE),
+            ),
+            ("-ms-expand", re.compile(r"[^{};]*:?-ms-expand\s*\{[^}]*\}", re.IGNORECASE)),
+            ("-ms-clear", re.compile(r"[^{};]*:?-ms-(?:clear|reveal)\s*\{[^}]*\}", re.IGNORECASE)),
+            ("-ms-reveal", re.compile(r"[^{};]*:?-ms-(?:clear|reveal)\s*\{[^}]*\}", re.IGNORECASE)),
+            (
+                "-ms-fullscreen",
+                re.compile(r"[^{};]*_?:-ms-fullscreen[^{};]*,\s*", re.IGNORECASE),
+            ),
+            (
+                "-ms-fullscreen",
+                re.compile(r",\s*[^{};]*_?:-ms-fullscreen[^{};]*(?=\s*\{)", re.IGNORECASE),
+            ),
+            (
+                "-ms-fullscreen",
+                re.compile(r"[^{};]*_?:-ms-fullscreen[^{};]*\{[^}]*\}", re.IGNORECASE),
+            ),
+            (r"\9", re.compile(r"[a-z0-9-]+:\s*[^;}]*?\x5c9\s*;?", re.IGNORECASE)),
+            ("height:", re.compile(r"(?<![-\w])height:\s*1\.5715\s*;?", re.IGNORECASE)),
+            (
+                "max-height:",
+                re.compile(r"(?<![-\w])max-height:\s*-[0-9]+(?:px|em|rem|%)?\s*;?", re.IGNORECASE),
             ),
         ]
 
@@ -162,10 +205,12 @@ def _sanitize_fab_static_assets():
                                 curr = next_close + 1
                         modified = modified[:start] + modified[curr:]
 
-                for pat in patterns:
-                    modified = pat.sub("", modified)
-                for pat, repl in replacements:
-                    modified = pat.sub(repl, modified)
+                for kw, pat, repl in guarded_replacements:
+                    if kw.lower() in modified.lower():
+                        modified = pat.sub(repl, modified)
+                for kw, pat in guarded_patterns:
+                    if kw.lower() in modified.lower():
+                        modified = pat.sub("", modified)
 
                 if modified != original:
                     with open(f, "w", encoding="utf-8") as fp:
