@@ -115,6 +115,14 @@ def _sanitize_fab_static_assets():
                 re.compile(r"(?<![-\w])max-height\s*:\s*auto\b", re.IGNORECASE),
                 "max-height: none",
             ),
+            (
+                "animation-fill-mode:",
+                re.compile(
+                    r"(?<![-\w])animation-fill-mode\s*:\s*(cubic-bezier\([^)]*\)|ease(?:-[a-z]+)*|linear)",
+                    re.IGNORECASE,
+                ),
+                r"animation-timing-function:\1",
+            ),
         ]
 
         guarded_patterns = [
