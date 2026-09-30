@@ -120,11 +120,34 @@ def _sanitize_fab_static_assets():
             ),
         ]
 
+        media_feature_removals = ["-ms-high-contrast"]
+
         for f in set(css_files):
             try:
                 with open(f, encoding="utf-8", errors="ignore") as fp:
                     original = fp.read()
                 modified = original
+                for feature in media_feature_removals:
+                    while True:
+                        m = re.search(
+                            rf"@media[^{{}}]*{re.escape(feature)}[^{{}}]*\{{",
+                            modified,
+                            re.IGNORECASE,
+                        )
+                        if not m:
+                            break
+                        start = m.start()
+                        brace_count = 0
+                        end = len(modified)
+                        for i in range(m.end() - 1, len(modified)):
+                            if modified[i] == "{":
+                                brace_count += 1
+                            elif modified[i] == "}":
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    end = i + 1
+                                    break
+                        modified = modified[:start] + modified[end:]
                 for pat in patterns:
                     modified = pat.sub("", modified)
                 for pat, repl in replacements:
