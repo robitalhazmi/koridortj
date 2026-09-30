@@ -10,10 +10,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <!-- Chart.js for live telemetry -->
-  <script src="/chart.min.js"></script>
-  <!-- Superset Embedded SDK -->
-  <script src="/superset-embedded-sdk.js"></script>
 </head>
 <body>
   <!-- Header -->
@@ -196,6 +192,9 @@
     </div>
   </footer>
 
-  <script src="/app.js"></script>
+  <!-- Scripts -->
+  <script src="/chart.min.js" defer></script>
+  <script src="/superset-embedded-sdk.js" defer></script>
+  <script src="/app.js" defer></script>
 </body>
 </html>

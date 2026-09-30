@@ -295,6 +295,27 @@ def _sanitize_fab_static_assets():
                         fp.write(modified)
             except Exception:
                 continue
+
+        # Sanitize templates to use defer instead of async on script bundles
+        template_dirs = [
+            "/app/superset/templates",
+            os.path.join(os.path.dirname(__file__), "templates"),
+        ]
+        template_files = []
+        for td in template_dirs:
+            if os.path.exists(td):
+                template_files.extend(glob.glob(os.path.join(td, "**", "*.html"), recursive=True))
+
+        for tf in set(template_files):
+            try:
+                with open(tf, encoding="utf-8", errors="ignore") as fp:
+                    orig_tmpl = fp.read()
+                if " async nonce=" in orig_tmpl:
+                    mod_tmpl = orig_tmpl.replace(" async nonce=", " defer nonce=")
+                    with open(tf, "w", encoding="utf-8") as fp:
+                        fp.write(mod_tmpl)
+            except Exception:
+                continue
     except Exception:
         pass
 

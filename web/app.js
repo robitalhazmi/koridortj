@@ -225,7 +225,11 @@ function toggleDashboardFullscreen() {
   card.classList.toggle('fullscreen-mode');
 }
 
-// Initial load
-document.addEventListener('DOMContentLoaded', () => {
+// Initial load - wait for window load event to ensure all external stylesheets and fonts are resolved
+if (document.readyState === 'complete') {
   fetchLiveStats();
-});
+} else {
+  window.addEventListener('load', () => {
+    fetchLiveStats();
+  });
+}
