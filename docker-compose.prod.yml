@@ -1,0 +1,131 @@
+services:
+  superset-init:
+    image: apache/superset:4.0.1
+    user: "0"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-koridortj_superset_secret_key_9876543210abcdef}
+      SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+      SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
+      POSTGRES_USER: ${PROD_POSTGRES_USER:-${POSTGRES_USER:-postgres}}
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-postgres_dev_password}}
+      POSTGRES_HOST: ${PROD_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: "${PROD_POSTGRES_PORT:-5432}"
+      POSTGRES_DB_SUPERSET: ${POSTGRES_DB_SUPERSET:-superset_meta}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/init_public_role.py:/app/pythonpath/init_public_role.py:ro
+      - superset_home:/app/superset_home
+    command: >
+      bash -c "
+      echo '=== Upgrading Superset DB ===' &&
+      superset db upgrade &&
+      echo '=== Initializing Roles ===' &&
+      superset init &&
+      echo '=== Configuring Admin & Public/Guest Roles ===' &&
+      python /app/pythonpath/init_public_role.py
+      "
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 600M
+    networks:
+      - koridortj-prod-network
+
+  superset:
+    image: apache/superset:4.0.1
+    restart: unless-stopped
+    user: "0"
+    environment:
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-koridortj_superset_secret_key_9876543210abcdef}
+      SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+      SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
+      POSTGRES_USER: ${PROD_POSTGRES_USER:-${POSTGRES_USER:-postgres}}
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-postgres_dev_password}}
+      POSTGRES_HOST: ${PROD_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: "${PROD_POSTGRES_PORT:-5432}"
+      POSTGRES_DB_SUPERSET: ${POSTGRES_DB_SUPERSET:-superset_meta}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@koridortj.id}
+      # CPU & Concurrency Optimizations for 1 vCPU / 2GB VPS
+      SUPERSET_WORKERS: "1"
+      WEB_CONCURRENCY: "1"
+      SUPERSET_WEBSERVER_THREADS: "4"
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/init_public_role.py:/app/pythonpath/init_public_role.py:ro
+      - superset_home:/app/superset_home
+    ports:
+      - "${SUPERSET_PORT:-8088}:8088"
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8088/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 600M
+    networks:
+      - koridortj-prod-network
+
+  token-service:
+    build:
+      context: .
+      dockerfile: services/guest_token_service/Dockerfile
+    image: koridortj-token-service:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8005}:8000"
+    environment:
+      POSTGRES_HOST: ${PROD_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: "${PROD_POSTGRES_PORT:-5432}"
+      POSTGRES_DB_WAREHOUSE: ${PROD_POSTGRES_DB_WAREHOUSE:-${POSTGRES_DB_WAREHOUSE:-warehouse}}
+      POSTGRES_READONLY_USER: ${PROD_POSTGRES_READONLY_USER:-${POSTGRES_READONLY_USER:-superset_ro}}
+      POSTGRES_READONLY_PASSWORD: ${PROD_POSTGRES_READONLY_PASSWORD:-${POSTGRES_READONLY_PASSWORD:-superset_ro_dev_password}}
+      SUPERSET_DOMAIN: ${SUPERSET_DOMAIN:-http://localhost:8088}
+      SUPERSET_DASHBOARD_ID: ${SUPERSET_DASHBOARD_ID:-45d44fda-4e9c-4a88-894d-819f66fbfd33}
+      SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
+      SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
+    volumes:
+      - ./web:/app/web:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    networks:
+      - koridortj-prod-network
+
+volumes:
+  superset_home:
+
+networks:
+  koridortj-prod-network:
+    driver: bridge
