@@ -208,7 +208,7 @@ class TapReplayProducer:
                         time.sleep(min(time_to_wait, 1.0))
 
                     # Calculate current simulated timestamp (never in the future)
-                    sim_event_ts = pass_start_wall_dt.timestamp() + scaled_simulated_seconds
+                    sim_event_ts = min(datetime.now(UTC).timestamp(), pass_start_wall_dt.timestamp() + scaled_simulated_seconds)
                     sim_event_dt = datetime.fromtimestamp(sim_event_ts, tz=UTC)
 
                     if orig_tap_out:

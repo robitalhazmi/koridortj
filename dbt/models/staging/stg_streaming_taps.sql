@@ -27,7 +27,7 @@ tap_ins as (
         _ingested_at,
         _source_topic as _source_file
     from source
-    where tap_in_time is not null and tap_in_stops is not null
+    where tap_in_time is not null and tap_in_stops is not null and tap_in_time <= now()
 ),
 
 tap_outs as (
@@ -55,7 +55,7 @@ tap_outs as (
         _ingested_at,
         _source_topic as _source_file
     from source
-    where tap_out_time is not null and tap_out_stops is not null
+    where tap_out_time is not null and tap_out_stops is not null and tap_out_time <= now()
 ),
 
 unioned as (

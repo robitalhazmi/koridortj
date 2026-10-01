@@ -3,48 +3,62 @@
 ## 1. Goals and non-goals
 
 **Goals**
-- Demonstrate every "must-have" in the Data Engineer JD with a real, runnable system (not slides).
+- Demonstrate every "must-have" in the Data Engineer JD with a real, runnable system.
 - Cover the "plus" items (streaming, Golang, CI/CD, containerization, cloud, governance) without turning the core build into a sprawl.
+- Right-size the design to the actual hardware available (a 1 vCPU / 2GB VPS) rather than assuming unlimited resources — and make that reasoning visible, since it's itself a demonstrable engineering judgment.
 - Produce something genuinely inspectable by a non-technical visitor (public dashboard) and a technical one (dbt docs, ERD, GitHub repo, CI badge).
 - Be honest about which data is real (Transjakarta network structure) vs. simulated (transaction volumes).
 
 **Non-goals**
-- This is not a claim of real Transjakarta ridership statistics — see the disclaimer pattern used throughout.
-- Not aiming for production-grade high availability; aiming for a correct, well-documented, single-node-per-service deployment that a reviewer can actually click through.
+- Not a claim of real Transjakarta ridership statistics.
+- Not aiming for production-grade high availability; aiming for a correct, well-documented system a reviewer can actually click through.
 
-## 2. Tech stack, with rationale
+## 2. Environments: local dev/compute vs. VPS serving
+
+This project deliberately runs in two places. The target VPS (1 vCPU / 2GB RAM) isn't big enough to run an orchestrator, a streaming broker, and a BI tool simultaneously and reliably — Airflow's own docs ask for 4GB RAM and 2 cores just for Airflow itself, and Coolify's own documented minimum (2 vCPU / 2GB) already consumes most of what the box has before anything else is deployed.
+
+| Environment | Runs | Always-on? |
+|---|---|---|
+| **Local (your laptop)** | Airflow (webserver + scheduler), Kafka, replay producer/consumer, dbt, a local "dev" Postgres | No — only while you're actively working |
+| **VPS, via Coolify** | A "production" Postgres (Coolify-managed), a trimmed Superset, the guest-token service, the dbt docs static site | Yes — this is the public-facing demo |
+
+A **promotion script** (§14) is the only link between the two: after a local pipeline run passes its dbt tests, the script pushes the finalized warehouse tables and freshly-generated dbt docs to the VPS. The production Postgres is never written to by an untested run, and your laptop never needs to be reachable from the internet.
+
+## 3. Tech stack, with rationale
 
 | Layer | Choice | Why |
 |---|---|---|
 | Language | Python 3.11+ | Strongest language; ecosystem fit for every layer below |
-| Optional 2nd language | Go | Stretch-only; JD lists Golang as a plus, kept isolated so it's not a dependency for the core pipeline |
-| Warehouse | PostgreSQL | Free, self-hostable, exactly matches "hands-on experience with Postgres"; BigQuery mirror is a clearly separated stretch task |
-| Orchestration | Apache Airflow | Named explicitly in the JD; industry standard; first orchestration project, so kept to LocalExecutor (simpler mental model) |
-| Transformation | dbt-core | Market-standard ELT transformation tool; gives tests, docs, and lineage "for free," which directly covers the JD's quality/documentation/governance asks |
-| Streaming | Apache Kafka (KRaft mode) | Named explicitly in the JD; KRaft mode means no ZooKeeper, so the Compose setup is not much heavier than a Kafka-compatible alternative |
-| Data quality | dbt tests + Pydantic (+ optional Great Expectations, stretch) | dbt tests cover the warehouse layer; Pydantic covers the ingestion boundary (schema validation before anything lands) |
-| BI | Apache Superset | Apache-family tool that pairs naturally with Airflow/Kafka for a cohesive "Apache stack" story, and reads as more DE-specific to interviewers; public embedding needs a small guest-token service rather than a one-click toggle (see §10) — that gap becomes a core Phase 7 task, doubling as the JD's Golang-plus item |
-| Containers | Docker + Docker Compose | Directly named in the JD; one compose file can run the whole stack locally or on the VPS |
-| CI/CD | GitHub Actions | Matches "GitHub to sync code"; free for public repos; directly named pattern in the JD (CI/CD) |
-| Hosting | Your VPS, managed by Coolify | Coolify deploys the Docker Compose stack straight from GitHub, handles HTTPS automatically (Traefik under the hood), and provides a managed Postgres resource with automated backups — real infra ownership with far less manual ops |
+| Optional 2nd language | Go | Used for the guest-token service (§11) — a naturally-scoped place for the JD's Golang-plus line |
+| Warehouse (dev) | PostgreSQL, local Docker container | Disposable, fast to reset while iterating |
+| Warehouse (prod) | PostgreSQL, Coolify-managed resource on the VPS | Only ever holds promoted, test-passed data; automated backups via Coolify |
+| Orchestration | Apache Airflow — **local only** | Named explicitly in the JD; too heavy for the VPS, so it runs on your laptop |
+| Transformation | dbt-core, run locally against the dev warehouse | Gives tests, docs, and lineage "for free" |
+| Streaming | Apache Kafka (KRaft mode) — **local only** | Named explicitly in the JD; runs alongside Airflow on your laptop |
+| Data quality | dbt tests + Pydantic, run locally | dbt tests cover the warehouse layer; Pydantic covers the ingestion boundary |
+| BI | Apache Superset — **VPS only**, reads the production warehouse | Public-facing; trimmed to skip Celery/Redis since it only serves pre-computed dashboards, never runs live/async queries |
+| Containers | Docker + Docker Compose — `docker-compose.dev.yml` (local) and `docker-compose.prod.yml` (VPS) | Keeps the two environments explicit and independently runnable |
+| CI/CD | GitHub Actions | CI (lint/test) on every push; CD redeploys only the serving-layer code — data promotion is a separate, manual step (§14) |
+| Hosting | Your VPS, managed by Coolify, serving-layer only | Realistic for the hardware available |
 | IDE | Antigravity IDE | Already your chosen local dev environment |
 
-## 3. Data sources
+## 4. Data sources
 
 | Source | What it provides | Nature |
 |---|---|---|
-| Transjakarta official GTFS feed (via their public open-data portal, `ppid.transjakarta.co.id` → GTFS zip) | Routes, stops, trips, calendars/schedules for the full BRT network | **Real**, official, updates periodically |
-| Public Transjakarta tap-in/tap-out transaction dataset | Per-trip transaction-like records (timestamps, stop/route references) generated with Faker on top of the real route/stop master data | **Simulated** — no real transaction data has been publicly released, so this fills that gap safely |
+| Transjakarta official GTFS feed (`ppid.transjakarta.co.id` → GTFS zip) | Routes, stops, trips, calendars/schedules | **Real**, official, updates periodically |
+| Public Transjakarta tap-in/tap-out transaction dataset | Per-trip transaction-like records generated with Faker on top of real route/stop master data | **Simulated** — no real transaction data has been publicly released |
 
-Both sources must be re-verified for current URLs/terms before you start Phase 1, since portal URLs and dataset hosting can change. Store the exact source URL and access date in `/docs/data_sources.md` when you download them.
+Re-verify both URLs/terms before Phase 1, since portal links can drift. Store the exact source URL and access date in `/docs/data_sources.md`.
 
-**Labeling rule (apply everywhere):** any UI, dashboard, or doc that shows tap/ridership numbers must say "simulated data" in the same view — not just in a README three clicks away.
+**Labeling rule (apply everywhere):** any UI, dashboard, or doc showing tap/ridership numbers must say "simulated data" in the same view.
 
-## 4. Repo structure
+## 5. Repo structure
 
 ```
 KoridorTJ/
-├── docker-compose.yml
+├── docker-compose.dev.yml       # Airflow, Kafka, dev Postgres, producer, consumer
+├── docker-compose.prod.yml      # Superset, guest-token service (Postgres is a Coolify-managed resource, not in this file)
 ├── .env.example
 ├── README.md
 ├── docs/
@@ -70,89 +84,109 @@ KoridorTJ/
 ├── superset/
 │   └── (exported dashboard/dataset definitions, optional)
 ├── services/
-│   └── guest_token_service/   # small Python or Go service issuing Superset guest tokens for the public embed page
+│   └── guest_token_service/
+├── scripts/
+│   └── promote_to_prod.sh
 └── .github/
     └── workflows/
         ├── ci.yml
         └── cd.yml
 ```
 
-## 5. Data model (star schema)
+## 6. Data model (star schema)
 
 - `dim_routes` — route_id, route_name, route_type, corridor_code
 - `dim_stops` — stop_id, stop_name, latitude, longitude
 - `dim_corridors` — corridor_code, corridor_name, direction
 - `dim_calendar` — date, day_of_week, is_weekend, is_holiday
-- `fact_taps` — tap_id, route_id (FK), stop_id (FK), date_id (FK), tap_type (in/out), tap_timestamp, is_simulated (always true, kept as an explicit column so it can never be dropped silently downstream)
+- `fact_taps` — tap_id, route_id (FK), stop_id (FK), date_id (FK), tap_type (in/out), tap_timestamp, is_simulated (always true — kept as a real column so a future real source could be UNIONed in later without relabeling everything by hand)
 
-Keep `is_simulated` as a real column, not just documentation — it means any future real data source could be UNIONed in later without relabeling everything by hand.
+This schema is identical in the dev and production Postgres instances — production simply receives a copy of dev's finished tables via the promotion script, not a separate dbt run.
 
-## 6. Streaming design
+## 7. Streaming design (local only)
 
-- **Topic:** `taps.raw` (JSON events), **dead-letter topic:** `taps.deadletter`
-- **Producer (`replay_producer.py`):** reads the historical tap dataset in timestamp order, rewrites each record's timestamp relative to "now" using a configurable speed multiplier (e.g., 1 real day of history replayed every 10 minutes), publishes to `taps.raw`
-- **Consumer (`tap_consumer.py`):** validates each message against a Pydantic schema; valid → insert into raw Postgres table `raw.taps`; invalid → publish to `taps.deadletter` with the validation error attached
-- **Why replay, not a live feed:** no confirmed public real-time Transjakarta feed was found; replay is the standard, transparent way to demonstrate streaming ingestion patterns without fabricating a live data source
+- **Topic:** `taps.raw`; **dead-letter topic:** `taps.deadletter`
+- **Producer (`replay_producer.py`):** reads the historical tap dataset in timestamp order, rewrites timestamps relative to "now" at a configurable speed multiplier, publishes to `taps.raw`
+- **Consumer (`tap_consumer.py`):** validates each message with Pydantic; valid → insert into the local dev Postgres; invalid → publish to `taps.deadletter` with the validation error attached
+- **Why replay, not a live feed:** no confirmed public real-time Transjakarta feed was found; replay is the standard, transparent way to demonstrate streaming ingestion without fabricating a live source
 
-## 7. Airflow DAGs
+## 8. Airflow DAGs (local only)
 
 | DAG | Schedule | Tasks |
 |---|---|---|
-| `gtfs_ingest` | Weekly | download GTFS zip → validate structure → load raw tables → log row-count deltas |
-| `warehouse_build` | Nightly | `dbt run` → `dbt test` → on failure, fail loudly (no silent partial loads) |
+| `gtfs_ingest` | Weekly | download GTFS zip → validate structure → load into the local dev warehouse → log row-count deltas |
+| `warehouse_build` | Nightly / on demand | `dbt run` → `dbt test` against the local dev warehouse → fail loudly on any test failure |
 
-Both DAGs should be written idempotently (safe re-runs), and use Airflow connections/variables for credentials — never hardcode them in the DAG file.
+Both DAGs run entirely on your laptop and never write to production — that only happens through the promotion script (§14). Write them idempotently, and use Airflow connections/variables for the dev Postgres credentials.
 
-## 8. dbt project layout
+## 9. dbt project layout
 
-- `staging/`: 1:1 cleaned views over raw tables (renaming, type casting, light filtering)
-- `warehouse/`: the star schema models described in §5
+- `staging/`: 1:1 cleaned views over raw tables
+- `warehouse/`: the star schema models in §6
 - `schema.yml` per folder: column descriptions + tests (`not_null`, `unique`, `relationships`, `accepted_values`)
-- At least 3 custom singular tests in `tests/`: e.g. no tap timestamps in the future, tap-out always after matching tap-in, all `stop_id`s in `fact_taps` exist in `dim_stops`
+- At least 3 custom singular tests in `tests/`
+- dbt only ever runs against the local **dev** target — there is no dbt "prod" target; production receives a copy of dev's finished tables via §14
 
-## 9. Data quality & governance
+## 10. Data quality & governance
 
-- **Quality gate:** `warehouse_build` DAG fails if `dbt test` fails — no bad data reaches Metabase
-- **Metadata:** `dbt docs generate` + `dbt docs serve` (or host the static output) gives a browsable catalog with column descriptions and a lineage graph — this is your "documentation for data models and system flows" deliverable, and doubles as lightweight data governance/metadata management
-- **Manual docs:** `/docs/data_dictionary.md` (plain-English column definitions) and `/docs/erd.md` (Mermaid ER diagram) for reviewers who don't want to run dbt docs locally
+- **Quality gate:** the `warehouse_build` DAG fails if `dbt test` fails, and the promotion script re-checks tests one more time before touching production
+- **Metadata:** `dbt docs generate` (run locally) gives a browsable catalog with column descriptions and a lineage graph; the static output is published to the VPS during promotion
+- **Manual docs:** `/docs/data_dictionary.md` and `/docs/erd.md` for reviewers who don't want to run dbt docs locally
 
-## 10. BI / dashboard plan
+## 11. BI / dashboard plan
 
-- Apache Superset connected directly to the Postgres warehouse (read-only DB user, not the ingestion user)
+- Apache Superset (on the VPS) connected to the **production** Postgres via a read-only role — Superset never talks to the local dev database
 - Suggested dashboards: ridership by corridor & hour-of-day, weekday vs. weekend pattern, top boarding stops, simple network map if stop lat/long renders cleanly
-- Superset dashboards are private by default — there's no one-click "make public" toggle. To make a dashboard genuinely public: enable the `EMBEDDED_SUPERSET` feature flag, build a small **guest-token service** (Python/FastAPI or Go) that mints short-lived Superset guest JWTs for anonymous visitors, and embed the dashboard on a small public HTML page that calls that service. Writing it in Go covers the JD's Golang-plus line with a naturally-scoped piece of work rather than a bolted-on stretch goal.
-- Keep the Superset admin console itself unexposed (no public domain) — only the embed page and the token service are public-facing
+- Superset dashboards are private by default — there's no one-click "make public" toggle. Enable the `EMBEDDED_SUPERSET` feature flag, build a small **guest-token service** (Python/FastAPI or Go) that mints short-lived guest JWTs, and embed the dashboard on a small public HTML page that calls that service
+- Because Superset here only ever serves dashboards refreshed by the promotion script (never a live/changing source), Celery and Redis — needed mainly for async queries, alerts, and scheduled reports — can be skipped entirely; run Superset with a single synchronous Gunicorn worker, which matters on a 2GB box
+- Keep the Superset admin console itself unexposed — only the embed page and the token service are public-facing
 
-## 11. Containerization
+## 12. Containerization
 
-Single `docker-compose.yml` with services: `postgres`, `kafka` (KRaft, single broker), `airflow-webserver`, `airflow-scheduler`, `replay-producer`, `tap-consumer`, `metabase`. Keep resource limits explicit (`mem_limit`, `cpus`) so it fits comfortably on your VPS.
+- **`docker-compose.dev.yml`** (local, your laptop): Postgres (dev warehouse + Airflow metadata), Kafka (KRaft, single broker), Airflow webserver + scheduler, replay-producer, tap-consumer. Full resources available — no need to trim.
+- **`docker-compose.prod.yml`** (VPS, via Coolify): Superset (single Gunicorn worker, no Celery/Redis), guest-token service. Postgres is a separate Coolify-managed database resource, not a service in this file. Set explicit `mem_limit`/`cpus` on both containers to stay well within the VPS's 2GB.
 
-## 12. Deployment to the VPS (via Coolify)
+## 13. Deployment to the VPS (via Coolify) — serving layer only
 
-1. In Coolify, create a **Docker Compose** resource pointing at the GitHub repo/branch, using `docker-compose.yml` as the deployment definition
-2. Create a **Coolify-managed Postgres** database resource (free automated backups) with two logical databases — `warehouse` and `airflow_meta` — instead of running Postgres as a plain compose service
-3. Assign a subdomain per public-facing service (e.g. `embed.yourdomain` for the public dashboard page, `dbtdocs.yourdomain` for the catalog) — Coolify/Traefik issues HTTPS certs automatically per domain
-4. Set all secrets (DB password, Airflow Fernet key, Kafka config, guest-token signing key) as environment variables on the Coolify resource itself, not in a repo `.env` — keep `.env.example` in the repo for local dev only
-5. Leave Airflow and the Superset admin console **unexposed** (no public domain, or behind Coolify's basic auth) — only the embed page, the token service, and the dbt docs site get public domains
-6. First deploy manually from the Coolify UI to confirm the stack behaves; wire automatic, CI-gated redeploys afterward (§13)
+1. In Coolify, create a **Postgres database** resource — this is the production warehouse
+2. In Coolify, create a **Docker Compose** resource pointing at `docker-compose.prod.yml`, with env vars (including the production Postgres connection string) set in Coolify's UI, not in a repo `.env`
+3. Assign subdomains: one for the public embed page / guest-token service, one for the dbt docs static site
+4. Leave the Superset admin console unexposed
+5. First deploy manually from the Coolify UI; confirm Superset connects to production and the embed page renders
+6. From here, this environment barely changes day to day — new data arrives only via promotion (§14); new *code* changes redeploy via CD (§15)
 
-## 13. CI/CD (GitHub Actions)
+## 14. Dev → prod promotion pipeline
 
-- **`ci.yml`** (on pull request): `ruff`/`black` check, `sqlfluff` lint on SQL, `pytest` for ingestion/validation code, `dbt test` run against a throwaway Postgres service container in the Action runner
-- **`cd.yml`** (on push to `main`, after CI passes): build Docker images, push to GHCR, then call Coolify's REST API (or the community `coolify-deploy-action`) with a `COOLIFY_API_TOKEN` secret to trigger a redeploy of the Compose resource — keeps deploys gated behind passing CI rather than relying on Coolify's own raw auto-deploy-on-push
-- Add a status badge for `ci.yml` to the top of `README.md`
+The one deliberate manual step connecting your laptop to the public demo.
 
-## 14. Security & secrets handling
+- **When:** whenever you want the public dashboard to reflect a new pipeline run — not on every DAG run, only when you're happy with the result
+- **What `scripts/promote_to_prod.sh` does:**
+  1. Runs `dbt test` one more time against the local dev warehouse as a final gate — refuses to promote if anything fails
+  2. `pg_dump`s the finalized warehouse tables (the `dim_*`/`fact_*` models, not raw/staging) from the local dev Postgres
+  3. Opens a short-lived SSH tunnel to the VPS and `pg_restore`s into the production database
+  4. Runs `dbt docs generate` locally, then copies the generated static site to wherever `docker-compose.prod.yml`'s static-file server serves it from
+- **Why an SSH tunnel, not an open port:** the production Postgres never needs to accept connections from the wider internet — only from you, only while promoting. Keeping it closed by default is meaningfully better security for very little extra effort.
+- **Failure mode:** if the dbt-test gate fails, nothing is promoted and the public dashboard keeps showing the last good run.
 
-- `.env.example` in the repo with placeholder values for local dev; production secrets live only in Coolify's per-resource environment variable settings and in GitHub Actions secrets (`COOLIFY_API_TOKEN`) — never in Git
-- Superset and Airflow admin UIs should sit behind their own auth, and ideally not be publicly exposed at all — only the embed page, the guest-token service, and the dbt docs site should have public domains
-- Use a read-only Postgres role for Superset; a separate role for dbt/Airflow with only the privileges it needs; the guest-token service itself needs no direct database access
+## 15. CI/CD (GitHub Actions)
 
-## 15. Stretch goals (see `TASKS.md` for the checklist form)
+- **`ci.yml`** (on pull request): `ruff`/`black`, `sqlfluff`, `pytest`, and `dbt test` against an ephemeral Postgres service container in the runner
+- **`cd.yml`** (on push to `main`, after CI passes): builds and pushes images for the serving-layer services only, then calls Coolify's API (or `coolify-deploy-action`, gated by a `COOLIFY_API_TOKEN` secret) to redeploy `docker-compose.prod.yml`
+- **Data promotion is intentionally not part of `cd.yml`** — it's the manual step in §14, run from your laptop, since that's where the dev warehouse lives. A stretch goal in `TASKS.md` covers optionally triggering it from a self-hosted Actions runner on your own machine.
 
-- Extend the guest-token service into a small Go-based "network health" API exposing live pipeline status (last successful DAG run, consumer lag) for extra Golang depth beyond the core token service
-- BigQuery free-tier warehouse mirror, to explicitly demonstrate a managed cloud warehouse alongside self-hosted Postgres
-- Great Expectations as an additional, independent validation layer on the raw landing zone
-- dbt snapshots (SCD2) to track GTFS route/stop changes across feed pulls over time
-- Terraform for VPS/DNS provisioning
+## 16. Security & secrets handling
+
+- `.env.example` in the repo for local dev only; production secrets (production Postgres URL, Superset secret key, guest-token signing key) live in Coolify's per-resource environment variable settings, and `COOLIFY_API_TOKEN` lives in GitHub Actions secrets — never in Git
+- The production Postgres is not exposed on a public port; the promotion script reaches it only via a short-lived SSH tunnel authenticated with your own SSH key
+- Superset and Airflow admin UIs stay unexposed — Airflow doesn't run on the VPS at all; only the embed page, the guest-token service, and the dbt docs site get public domains
+- Use a read-only Postgres role for Superset on the production database; the promotion script's role needs write access but is only reachable via the SSH tunnel
+
+## 17. Stretch goals
+
+- Extend the guest-token service into a small Go-based "network health" API (pipeline status, last successful local DAG run, consumer lag)
+- Mirror the local dev warehouse into BigQuery free tier, to explicitly demonstrate a managed cloud warehouse
+- Add Great Expectations as a second, independent validation layer on the raw landing zone (local)
+- Add dbt snapshots (SCD2) to track GTFS route/stop changes across feed pulls over time
+- Add Terraform for VPS/DNS provisioning
+- Run a self-hosted GitHub Actions runner on your laptop so the promotion script can be triggered from a `workflow_dispatch` button instead of run by hand — the data never has to leave your machine except during the promotion itself
 - A simple public static insights page (e.g. Evidence.dev or GitHub Pages) for non-technical visitors
