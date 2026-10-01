@@ -1,7 +1,7 @@
 # KoridorTJ — A Transjakarta Data Platform
 *A portfolio project built to demonstrate the Data Engineer skill set*
 
-> Working name: **KoridorTJ**. Rename it to whatever you like — the repo, the DAGs, and the dbt project are all named generically enough to make renaming a find-and-replace job.
+> Working name: **KoridorTJ**.
 
 ---
 
