@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 
 from flask import g
 from superset.security import SupersetSecurityManager
@@ -13,7 +14,9 @@ POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_DB_SUPERSET = os.getenv("POSTGRES_DB_SUPERSET", "superset_meta")
 
-SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB_SUPERSET}"
+_encoded_user = urllib.parse.quote_plus(POSTGRES_USER)
+_encoded_password = urllib.parse.quote_plus(POSTGRES_PASSWORD)
+SQLALCHEMY_DATABASE_URI = f"postgresql+psycopg2://{_encoded_user}:{_encoded_password}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB_SUPERSET}"
 
 # CSRF & Embedding Configuration
 WTF_CSRF_ENABLED = False
