@@ -37,6 +37,7 @@ GUEST_TOKEN_JWT_ALGO = "HS256"
 GUEST_TOKEN_JWT_EXP_SECONDS = 3600
 
 
+ENABLE_CORS = True
 CORS_OPTIONS = {
     "supports_credentials": True,
     "allow_headers": ["*"],
