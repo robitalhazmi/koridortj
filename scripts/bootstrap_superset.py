@@ -43,6 +43,8 @@ WAREHOUSE_DB_URI = os.getenv(
     f"postgresql+psycopg2://{_encoded_ro_user}:{_encoded_ro_pass}@{PG_HOST}:{PG_PORT}/{PG_DB}",
 )
 
+REQUEST_TIMEOUT = 60
+
 
 class SupersetProvisioner:
     """Manages Superset API automation."""
@@ -66,7 +68,7 @@ class SupersetProvisioner:
         start = time.time()
         while time.time() - start < timeout_seconds:
             try:
-                res = self.session.get(f"{self.base_url}/health", timeout=5)
+                res = self.session.get(f"{self.base_url}/health", timeout=10)
                 if res.status_code == 200:
                     logger.info("Superset is up and healthy!")
                     return True
@@ -76,8 +78,8 @@ class SupersetProvisioner:
         logger.error("Timed out waiting for Superset.")
         return False
 
-    def login(self) -> bool:
-        """Authenticate and obtain JWT access token and CSRF token."""
+    def login(self, max_retries: int = 3) -> bool:
+        """Authenticate and obtain JWT access token and CSRF token with retries."""
         login_url = f"{self.base_url}/api/v1/security/login"
         payload = {
             "username": self.username,
@@ -85,40 +87,63 @@ class SupersetProvisioner:
             "provider": "db",
             "refresh": True,
         }
-        logger.info("Authenticating with Superset API as '%s'...", self.username)
-        res = self.session.post(login_url, json=payload, timeout=10)
-        if res.status_code != 200:
-            logger.error("Login failed (HTTP %d): %s", res.status_code, res.text)
-            return False
 
-        self.access_token = res.json().get("access_token")
-        self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
+        for attempt in range(1, max_retries + 1):
+            logger.info(
+                "Authenticating with Superset API as '%s' (Attempt %d/%d)...",
+                self.username,
+                attempt,
+                max_retries,
+            )
+            try:
+                res = self.session.post(login_url, json=payload, timeout=REQUEST_TIMEOUT)
+                if res.status_code != 200:
+                    logger.error("Login failed (HTTP %d): %s", res.status_code, res.text)
+                    if res.status_code == 401:
+                        logger.error(
+                            "Invalid credentials for user '%s'. Please verify SUPERSET_ADMIN_PASSWORD.",
+                            self.username,
+                        )
+                        return False
+                    time.sleep(3)
+                    continue
 
-        # Fetch CSRF token
-        csrf_url = f"{self.base_url}/api/v1/security/csrf_token/"
-        csrf_res = self.session.get(csrf_url, timeout=10)
-        if csrf_res.status_code == 200:
-            self.csrf_token = csrf_res.json().get("result")
-            self.session.headers.update({"X-CSRFToken": self.csrf_token})
-            logger.info("Successfully authenticated and obtained CSRF token.")
-            return True
-        return True
+                self.access_token = res.json().get("access_token")
+                self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
+
+                # Fetch CSRF token
+                csrf_url = f"{self.base_url}/api/v1/security/csrf_token/"
+                csrf_res = self.session.get(csrf_url, timeout=REQUEST_TIMEOUT)
+                if csrf_res.status_code == 200:
+                    self.csrf_token = csrf_res.json().get("result")
+                    self.session.headers.update({"X-CSRFToken": self.csrf_token})
+                    logger.info("Successfully authenticated and obtained CSRF token.")
+                return True
+            except requests.exceptions.RequestException as e:
+                logger.warning("Login attempt %d failed with error: %s", attempt, e)
+                time.sleep(3)
+
+        logger.error("Failed to authenticate with Superset after %d attempts.", max_retries)
+        return False
 
     def create_database_connection(self) -> int | None:
         """Create or find the PostgreSQL warehouse connection."""
         url = f"{self.base_url}/api/v1/database/"
-        res = self.session.get(url, timeout=10)
-        if res.status_code == 200:
-            for db in res.json().get("result", []):
-                if db.get("database_name") == "KoridorTJ Warehouse":
-                    db_id = db.get("id")
-                    logger.info("Found existing database connection (ID: %s)", db_id)
-                    self.session.put(
-                        f"{url}{db_id}",
-                        json={"expose_in_sqllab": True, "allow_run_async": False},
-                        timeout=10,
-                    )
-                    return db_id
+        try:
+            res = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            if res.status_code == 200:
+                for db in res.json().get("result", []):
+                    if db.get("database_name") == "KoridorTJ Warehouse":
+                        db_id = db.get("id")
+                        logger.info("Found existing database connection (ID: %s)", db_id)
+                        self.session.put(
+                            f"{url}{db_id}",
+                            json={"expose_in_sqllab": True, "allow_run_async": False},
+                            timeout=REQUEST_TIMEOUT,
+                        )
+                        return db_id
+        except Exception as e:
+            logger.warning("Error fetching databases: %s", e)
 
         payload = {
             "database_name": "KoridorTJ Warehouse",
@@ -130,7 +155,7 @@ class SupersetProvisioner:
             "allow_dml": False,
         }
         logger.info("Registering Database connection to warehouse...")
-        create_res = self.session.post(url, json=payload, timeout=10)
+        create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
         if create_res.status_code in (200, 201):
             db_id = create_res.json().get("id")
             logger.info("Database registered successfully with ID %s", db_id)
@@ -142,22 +167,25 @@ class SupersetProvisioner:
     def create_dataset(self, db_id: int, schema: str, table_name: str) -> int | None:
         """Register a table as a Superset dataset."""
         url = f"{self.base_url}/api/v1/dataset/"
-        res = self.session.get(url, timeout=10)
-        if res.status_code == 200:
-            for ds in res.json().get("result", []):
-                if ds.get("table_name") == table_name and ds.get("schema") == schema:
-                    ds_id = ds.get("id")
-                    logger.info(
-                        "Found existing dataset '%s.%s' (ID: %s)", schema, table_name, ds_id
-                    )
-                    return ds_id
+        try:
+            res = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            if res.status_code == 200:
+                for ds in res.json().get("result", []):
+                    if ds.get("table_name") == table_name and ds.get("schema") == schema:
+                        ds_id = ds.get("id")
+                        logger.info(
+                            "Found existing dataset '%s.%s' (ID: %s)", schema, table_name, ds_id
+                        )
+                        return ds_id
+        except Exception as e:
+            logger.warning("Error fetching datasets: %s", e)
 
         payload = {
             "database": db_id,
             "schema": schema,
             "table_name": table_name,
         }
-        create_res = self.session.post(url, json=payload, timeout=10)
+        create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
         if create_res.status_code in (200, 201):
             ds_id = create_res.json().get("id")
             logger.info(
@@ -169,7 +197,7 @@ class SupersetProvisioner:
                 "Dataset registration response for '%s.%s': %s", schema, table_name, create_res.text
             )
             # Re-fetch in case of race condition or existing record
-            re_res = self.session.get(url, timeout=10)
+            re_res = self.session.get(url, timeout=REQUEST_TIMEOUT)
             if re_res.status_code == 200:
                 for ds in re_res.json().get("result", []):
                     if ds.get("table_name") == table_name and ds.get("schema") == schema:
@@ -181,13 +209,16 @@ class SupersetProvisioner:
     ) -> int | None:
         """Create an analytical chart in Superset."""
         url = f"{self.base_url}/api/v1/chart/"
-        res = self.session.get(url, timeout=10)
-        if res.status_code == 200:
-            for ch in res.json().get("result", []):
-                if ch.get("slice_name") == slice_name:
-                    ch_id = ch.get("id")
-                    logger.info("Found existing chart '%s' (ID: %s)", slice_name, ch_id)
-                    return ch_id
+        try:
+            res = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            if res.status_code == 200:
+                for ch in res.json().get("result", []):
+                    if ch.get("slice_name") == slice_name:
+                        ch_id = ch.get("id")
+                        logger.info("Found existing chart '%s' (ID: %s)", slice_name, ch_id)
+                        return ch_id
+        except Exception as e:
+            logger.warning("Error fetching charts: %s", e)
 
         payload = {
             "slice_name": slice_name,
@@ -196,7 +227,7 @@ class SupersetProvisioner:
             "viz_type": viz_type,
             "params": json.dumps(params),
         }
-        create_res = self.session.post(url, json=payload, timeout=10)
+        create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
         if create_res.status_code in (200, 201):
             chart_id = create_res.json().get("id")
             logger.info("Chart '%s' created successfully with ID %s", slice_name, chart_id)
@@ -211,25 +242,28 @@ class SupersetProvisioner:
         dash_id: int | None = None
         dash_uuid: str | None = None
 
-        res = self.session.get(url, timeout=10)
-        if res.status_code == 200:
-            for d in res.json().get("result", []):
-                if (
-                    d.get("dashboard_title") == dashboard_title
-                    or d.get("slug") == "transjakarta-transit-intelligence"
-                ):
-                    dash_id = d.get("id")
-                    # Fetch detailed dashboard to get UUID
-                    d_res = self.session.get(f"{url}{dash_id}", timeout=10)
-                    if d_res.status_code == 200:
-                        dash_uuid = d_res.json().get("result", {}).get("uuid")
-                    logger.info(
-                        "Found existing dashboard '%s' (ID: %s, UUID: %s)",
-                        dashboard_title,
-                        dash_id,
-                        dash_uuid,
-                    )
-                    break
+        try:
+            res = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            if res.status_code == 200:
+                for d in res.json().get("result", []):
+                    if (
+                        d.get("dashboard_title") == dashboard_title
+                        or d.get("slug") == "transjakarta-transit-intelligence"
+                    ):
+                        dash_id = d.get("id")
+                        # Fetch detailed dashboard to get UUID
+                        d_res = self.session.get(f"{url}{dash_id}", timeout=REQUEST_TIMEOUT)
+                        if d_res.status_code == 200:
+                            dash_uuid = d_res.json().get("result", {}).get("uuid")
+                        logger.info(
+                            "Found existing dashboard '%s' (ID: %s, UUID: %s)",
+                            dashboard_title,
+                            dash_id,
+                            dash_uuid,
+                        )
+                        break
+        except Exception as e:
+            logger.warning("Error searching dashboards: %s", e)
 
         if not dash_id:
             payload = {
@@ -237,11 +271,11 @@ class SupersetProvisioner:
                 "published": True,
                 "slug": "transjakarta-transit-intelligence",
             }
-            create_res = self.session.post(url, json=payload, timeout=10)
+            create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
             if create_res.status_code in (200, 201):
                 dash_id = create_res.json().get("id")
                 # Fetch created dashboard to get UUID
-                d_res = self.session.get(f"{url}{dash_id}", timeout=10)
+                d_res = self.session.get(f"{url}{dash_id}", timeout=REQUEST_TIMEOUT)
                 if d_res.status_code == 200:
                     dash_uuid = d_res.json().get("result", {}).get("uuid")
                 logger.info(
@@ -253,7 +287,7 @@ class SupersetProvisioner:
 
         # Enable embedded dashboard
         embed_url = f"{self.base_url}/api/v1/dashboard/{dash_id}/embedded"
-        embed_res = self.session.get(embed_url, timeout=10)
+        embed_res = self.session.get(embed_url, timeout=REQUEST_TIMEOUT)
         embedded_uuid: str | None = None
 
         if embed_res.status_code == 200:
@@ -262,7 +296,9 @@ class SupersetProvisioner:
                 "Existing embedded dashboard configuration found (Embedded UUID: %s)", embedded_uuid
             )
         else:
-            post_embed = self.session.post(embed_url, json={"allowed_domains": []}, timeout=10)
+            post_embed = self.session.post(
+                embed_url, json={"allowed_domains": []}, timeout=REQUEST_TIMEOUT
+            )
             if post_embed.status_code in (200, 201):
                 embedded_uuid = post_embed.json().get("result", {}).get("uuid")
                 logger.info(
