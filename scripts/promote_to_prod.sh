@@ -123,58 +123,23 @@ else
         SSH_OPTS+=("-i" "${PROD_SSH_KEY}")
     fi
 
-    echo "Connecting to VPS (${PROD_SSH_USER}@${PROD_SSH_HOST}:${PROD_SSH_PORT}) to locate PostgreSQL container..."
-    REMOTE_PG_CONTAINER=$(ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
-        "docker ps --format '{{.Names}}' | grep -E 'postgres' | head -n 1" 2>/dev/null || true)
-
-    if [[ -n "${REMOTE_PG_CONTAINER}" ]]; then
-        echo "Found production PostgreSQL container: ${REMOTE_PG_CONTAINER}"
-        echo "Streaming ${DUMP_FILE} directly into production database (${PROD_PG_DB})..."
-        ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
-            "docker exec -i ${REMOTE_PG_CONTAINER} psql -U ${PROD_PG_USER} -d ${PROD_PG_DB}" < "${DUMP_FILE}"
-        echo "✅ Production database successfully updated."
-    else
-        echo "ℹ️  No remote postgres container auto-detected. Attempting SSH tunnel fallback..."
-        TUNNEL_PORT=65432
-        echo "Establishing temporary SSH tunnel via ${PROD_SSH_USER}@${PROD_SSH_HOST}:${PROD_SSH_PORT}..."
-        ssh -f -N -L "${TUNNEL_PORT}:${PROD_PG_HOST:-127.0.0.1}:${PROD_PG_PORT:-5432}" \
-            "${SSH_OPTS[@]}" \
-            -p "${PROD_SSH_PORT}" \
-            "${PROD_SSH_USER}@${PROD_SSH_HOST}"
-        
-        SSH_PID=$(pgrep -f "${TUNNEL_PORT}:${PROD_PG_HOST:-127.0.0.1}:${PROD_PG_PORT:-5432}" || true)
-        
-        cleanup_tunnel() {
-            if [[ -n "${SSH_PID}" ]]; then
-                echo "Closing temporary SSH tunnel (PID: ${SSH_PID})..."
-                kill -9 "${SSH_PID}" 2>/dev/null || true
-            fi
-        }
-        trap cleanup_tunnel EXIT
-
-        echo "Restoring data into production Postgres (${PROD_PG_DB})..."
-        if command -v psql >/dev/null 2>&1; then
-            PGPASSWORD="${PROD_PG_PASSWORD}" psql \
-                -h 127.0.0.1 \
-                -p "${TUNNEL_PORT}" \
-                -U "${PROD_PG_USER}" \
-                -d "${PROD_PG_DB}" \
-                -f "${DUMP_FILE}"
-        elif command -v docker >/dev/null 2>&1; then
-            docker run --rm --network host -i \
-                -e PGPASSWORD="${PROD_PG_PASSWORD}" \
-                postgres:16-alpine \
-                psql \
-                -h 127.0.0.1 \
-                -p "${TUNNEL_PORT}" \
-                -U "${PROD_PG_USER}" \
-                -d "${PROD_PG_DB}" < "${DUMP_FILE}"
-        else
-            echo "❌ Neither local psql client nor docker available to restore dump."
+    echo "Streaming ${DUMP_FILE} directly to VPS (${PROD_SSH_USER}@${PROD_SSH_HOST}:${PROD_SSH_PORT})..."
+    ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" "
+        set -e
+        PG_CONTAINER=\$(docker ps --format '{{.Names}} {{.Image}}' | grep -iE 'postgres' | awk '{print \$1}' | head -n 1)
+        if [ -z \"\${PG_CONTAINER}\" ]; then
+            echo '❌ Could not find PostgreSQL container on VPS.' >&2
+            echo 'Currently running containers on VPS:' >&2
+            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' >&2
             exit 1
         fi
-        echo "✅ Production database successfully updated."
-    fi
+        echo \"✅ Located production PostgreSQL container: \${PG_CONTAINER}\"
+        echo \"Restoring into database '${PROD_PG_DB}' as user '${PROD_PG_USER}'...\"
+        docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\"
+        echo '✅ Production warehouse tables restored successfully.'
+    " < "${DUMP_FILE}"
+
+    echo "✅ Step 3 completed successfully."
 fi
 
 # ------------------------------------------------------------------------------
