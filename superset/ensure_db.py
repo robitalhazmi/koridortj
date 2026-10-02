@@ -44,7 +44,7 @@ for i in range(30):
             last_err = e
     if connected:
         break
-    print(f"[{i+1}/30] Waiting for PostgreSQL at {host}:{port}... ({last_err})")
+    print(f"[{i + 1}/30] Waiting for PostgreSQL at {host}:{port}... ({last_err})")
     time.sleep(2)
 
 if not connected:

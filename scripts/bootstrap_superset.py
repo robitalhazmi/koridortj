@@ -265,7 +265,9 @@ class SupersetProvisioner:
                 )
             else:
                 logger.warning(
-                    "Dashboard creation failed (HTTP %d): %s", create_res.status_code, create_res.text
+                    "Dashboard creation failed (HTTP %d): %s",
+                    create_res.status_code,
+                    create_res.text,
                 )
                 # Try without slug if slug conflict
                 simple_payload = {
