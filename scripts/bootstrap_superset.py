@@ -139,19 +139,15 @@ class SupersetProvisioner:
     def create_dataset(self, db_id: int, schema: str, table_name: str) -> int | None:
         """Register a table as a Superset dataset."""
         url = f"{self.base_url}/api/v1/dataset/"
-        res = self.session.get(
-            f"{url}?q=(filters:[{{col:table_name,opr:eq,value:'{table_name}'}}])", timeout=10
-        )
+        res = self.session.get(url, timeout=10)
         if res.status_code == 200:
-            results = res.json().get("result", [])
-            if results:
-                logger.info(
-                    "Found existing dataset '%s.%s' (ID: %s)",
-                    schema,
-                    table_name,
-                    results[0].get("id"),
-                )
-                return results[0].get("id")
+            for ds in res.json().get("result", []):
+                if ds.get("table_name") == table_name and ds.get("schema") == schema:
+                    ds_id = ds.get("id")
+                    logger.info(
+                        "Found existing dataset '%s.%s' (ID: %s)", schema, table_name, ds_id
+                    )
+                    return ds_id
 
         payload = {
             "database": db_id,
@@ -169,6 +165,12 @@ class SupersetProvisioner:
             logger.warning(
                 "Dataset registration response for '%s.%s': %s", schema, table_name, create_res.text
             )
+            # Re-fetch in case of race condition or existing record
+            re_res = self.session.get(url, timeout=10)
+            if re_res.status_code == 200:
+                for ds in re_res.json().get("result", []):
+                    if ds.get("table_name") == table_name and ds.get("schema") == schema:
+                        return ds.get("id")
             return None
 
     def create_chart(
@@ -176,14 +178,13 @@ class SupersetProvisioner:
     ) -> int | None:
         """Create an analytical chart in Superset."""
         url = f"{self.base_url}/api/v1/chart/"
-        res = self.session.get(
-            f"{url}?q=(filters:[{{col:slice_name,opr:eq,value:'{slice_name}'}}])", timeout=10
-        )
+        res = self.session.get(url, timeout=10)
         if res.status_code == 200:
-            results = res.json().get("result", [])
-            if results:
-                logger.info("Found existing chart '%s' (ID: %s)", slice_name, results[0].get("id"))
-                return results[0].get("id")
+            for ch in res.json().get("result", []):
+                if ch.get("slice_name") == slice_name:
+                    ch_id = ch.get("id")
+                    logger.info("Found existing chart '%s' (ID: %s)", slice_name, ch_id)
+                    return ch_id
 
         payload = {
             "slice_name": slice_name,
@@ -207,21 +208,25 @@ class SupersetProvisioner:
         dash_id: int | None = None
         dash_uuid: str | None = None
 
-        res = self.session.get(
-            f"{url}?q=(filters:[{{col:dashboard_title,opr:eq,value:'{dashboard_title}'}}])",
-            timeout=10,
-        )
+        res = self.session.get(url, timeout=10)
         if res.status_code == 200:
-            results = res.json().get("result", [])
-            if results:
-                dash_id = results[0].get("id")
-                dash_uuid = results[0].get("uuid")
-                logger.info(
-                    "Found existing dashboard '%s' (ID: %s, UUID: %s)",
-                    dashboard_title,
-                    dash_id,
-                    dash_uuid,
-                )
+            for d in res.json().get("result", []):
+                if (
+                    d.get("dashboard_title") == dashboard_title
+                    or d.get("slug") == "transjakarta-transit-intelligence"
+                ):
+                    dash_id = d.get("id")
+                    # Fetch detailed dashboard to get UUID
+                    d_res = self.session.get(f"{url}{dash_id}", timeout=10)
+                    if d_res.status_code == 200:
+                        dash_uuid = d_res.json().get("result", {}).get("uuid")
+                    logger.info(
+                        "Found existing dashboard '%s' (ID: %s, UUID: %s)",
+                        dashboard_title,
+                        dash_id,
+                        dash_uuid,
+                    )
+                    break
 
         if not dash_id:
             payload = {
