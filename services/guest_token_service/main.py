@@ -86,8 +86,8 @@ def health_check():
             cur.execute("SELECT 1;")
         conn.close()
         db_status = "healthy"
-    except Exception as exc:
-        db_status = f"error: {str(exc)}"
+    except Exception:
+        db_status = "unavailable"
 
     return {
         "status": "healthy" if db_status == "healthy" else "degraded",
@@ -208,8 +208,8 @@ def get_live_stats():
             "hourly_distribution": hourly,
             "data_disclaimer": "Simulated passenger tap-in/tap-out transaction data modeled for portfolio demonstration.",
         }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Database query failed: {exc}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Database query failed")
 
 
 # Mount web directory (supports local dev repo structure, current working dir, and Docker /app/web)

@@ -11,6 +11,7 @@ import logging
 import os
 import sys
 import time
+import urllib.parse
 from typing import Any
 
 import requests
@@ -35,9 +36,11 @@ PG_HOST = os.getenv("POSTGRES_HOST", "postgres")
 PG_PORT = os.getenv("POSTGRES_PORT", "5432")
 PG_DB = os.getenv("POSTGRES_DB_WAREHOUSE", "warehouse")
 
+_encoded_ro_user = urllib.parse.quote_plus(RO_USER)
+_encoded_ro_pass = urllib.parse.quote_plus(RO_PASS)
 WAREHOUSE_DB_URI = os.getenv(
     "SUPERSET_WAREHOUSE_SQLALCHEMY_URI",
-    f"postgresql+psycopg2://{RO_USER}:{RO_PASS}@{PG_HOST}:{PG_PORT}/{PG_DB}",
+    f"postgresql+psycopg2://{_encoded_ro_user}:{_encoded_ro_pass}@{PG_HOST}:{PG_PORT}/{PG_DB}",
 )
 
 
