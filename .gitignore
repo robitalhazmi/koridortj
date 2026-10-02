@@ -99,3 +99,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Temporary artifacts and scratch files
+scratch/
+
