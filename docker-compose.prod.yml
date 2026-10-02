@@ -128,4 +128,5 @@ volumes:
 
 networks:
   koridortj-prod-network:
-    driver: bridge
+    name: ${DOCKER_NETWORK:-coolify}
+    external: true
