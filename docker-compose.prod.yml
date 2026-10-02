@@ -1,6 +1,9 @@
 services:
   superset:
-    image: apache/superset:4.0.1
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.superset
+    image: koridortj-superset:latest
     restart: unless-stopped
     user: "0"
     environment:
@@ -21,28 +24,7 @@ services:
       WEB_CONCURRENCY: "1"
       SUPERSET_WEBSERVER_THREADS: "4"
     volumes:
-      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
-      - ./superset/ensure_db.py:/app/pythonpath/ensure_db.py:ro
-      - ./superset/init_public_role.py:/app/pythonpath/init_public_role.py:ro
       - superset_home:/app/superset_home
-    command: >
-      bash -c "
-      echo '============================================================' &&
-      echo ' Starting KoridorTJ Superset Production Serving Node' &&
-      echo '============================================================' &&
-      echo '=== [1/4] Ensuring PostgreSQL Database Exists ===' &&
-      python /app/pythonpath/ensure_db.py &&
-      echo '=== [2/4] Running Superset Database Migrations ===' &&
-      superset db upgrade &&
-      echo '=== [3/4] Initializing Superset Security & Roles ===' &&
-      superset init &&
-      echo '=== [4/4] Configuring Admin & Guest Role Permissions ===' &&
-      python /app/pythonpath/init_public_role.py &&
-      echo '============================================================' &&
-      echo ' ✅ Superset Provisioning Complete — Starting Web Server' &&
-      echo '============================================================' &&
-      exec /usr/bin/run-server.sh
-      "
     ports:
       - "${SUPERSET_PORT:-8088}:8088"
     healthcheck:

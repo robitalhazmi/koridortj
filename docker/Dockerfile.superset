@@ -1,0 +1,15 @@
+FROM apache/superset:4.0.1
+
+USER root
+
+# Copy configuration, bootstrap scripts, and custom entrypoint
+COPY superset/superset_config.py /app/pythonpath/superset_config.py
+COPY superset/ensure_db.py /app/pythonpath/ensure_db.py
+COPY superset/init_public_role.py /app/pythonpath/init_public_role.py
+COPY superset/entrypoint.sh /app/entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh
+
+USER superset
+
+ENTRYPOINT ["/app/entrypoint.sh"]
