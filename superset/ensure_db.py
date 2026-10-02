@@ -12,7 +12,10 @@ user = os.getenv("POSTGRES_USER", "postgres")
 password = os.getenv("POSTGRES_PASSWORD", "postgres_dev_password")
 superset_db = os.getenv("POSTGRES_DB_SUPERSET", "superset_meta")
 
-print(f"Checking PostgreSQL at {host}:{port} as user '{user}'...")
+masked_pw = f"{password[:3]}...{password[-3:]}" if len(password) > 6 else "***"
+print(
+    f"Checking PostgreSQL at {host}:{port} as user '{user}' (pw_len: {len(password)}, preview: '{masked_pw}')..."
+)
 connected = False
 last_err = None
 
