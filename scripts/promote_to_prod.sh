@@ -119,9 +119,14 @@ if [[ -z "${PROD_SSH_HOST}" || -z "${PROD_PG_HOST}" ]]; then
     echo "    Skipping live remote promotion. Staged dump file ready at: ${DUMP_FILE}"
 else
     TUNNEL_PORT=65432
+    SSH_OPTS=()
+    if [[ -f "${PROD_SSH_KEY}" ]]; then
+        SSH_OPTS+=("-i" "${PROD_SSH_KEY}")
+    fi
+
     echo "Establishing temporary SSH tunnel via ${PROD_SSH_USER}@${PROD_SSH_HOST}:${PROD_SSH_PORT}..."
     ssh -f -N -L "${TUNNEL_PORT}:${PROD_PG_HOST}:${PROD_PG_PORT}" \
-        -i "${PROD_SSH_KEY}" \
+        "${SSH_OPTS[@]}" \
         -p "${PROD_SSH_PORT}" \
         "${PROD_SSH_USER}@${PROD_SSH_HOST}"
     
@@ -137,12 +142,26 @@ else
     trap cleanup_tunnel EXIT
 
     echo "Restoring data into production Postgres (${PROD_PG_DB})..."
-    PGPASSWORD="${PROD_PG_PASSWORD}" psql \
-        -h 127.0.0.1 \
-        -p "${TUNNEL_PORT}" \
-        -U "${PROD_PG_USER}" \
-        -d "${PROD_PG_DB}" \
-        -f "${DUMP_FILE}"
+    if command -v psql >/dev/null 2>&1; then
+        PGPASSWORD="${PROD_PG_PASSWORD}" psql \
+            -h 127.0.0.1 \
+            -p "${TUNNEL_PORT}" \
+            -U "${PROD_PG_USER}" \
+            -d "${PROD_PG_DB}" \
+            -f "${DUMP_FILE}"
+    elif command -v docker >/dev/null 2>&1; then
+        docker run --rm --network host -i \
+            -e PGPASSWORD="${PROD_PG_PASSWORD}" \
+            postgres:16-alpine \
+            psql \
+            -h 127.0.0.1 \
+            -p "${TUNNEL_PORT}" \
+            -U "${PROD_PG_USER}" \
+            -d "${PROD_PG_DB}" < "${DUMP_FILE}"
+    else
+        echo "❌ Neither local psql client nor docker available to restore dump."
+        exit 1
+    fi
     
     echo "✅ Production database successfully updated."
 fi
