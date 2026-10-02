@@ -61,6 +61,7 @@ class SupersetProvisioner:
         self.session = requests.Session()
         self.access_token: str | None = None
         self.csrf_token: str | None = None
+        self.user_id: int = 1
 
     def wait_for_superset(self, timeout_seconds: int = 180) -> bool:
         """Wait until Superset web server is responding."""
@@ -79,7 +80,7 @@ class SupersetProvisioner:
         return False
 
     def login(self, max_retries: int = 3) -> bool:
-        """Authenticate and obtain JWT access token and CSRF token with retries."""
+        """Authenticate and obtain JWT access token, CSRF token, and user ID."""
         login_url = f"{self.base_url}/api/v1/security/login"
         payload = {
             "username": self.username,
@@ -117,7 +118,17 @@ class SupersetProvisioner:
                 if csrf_res.status_code == 200:
                     self.csrf_token = csrf_res.json().get("result")
                     self.session.headers.update({"X-CSRFToken": self.csrf_token})
-                    logger.info("Successfully authenticated and obtained CSRF token.")
+
+                # Fetch current user ID
+                me_url = f"{self.base_url}/api/v1/me/"
+                me_res = self.session.get(me_url, timeout=REQUEST_TIMEOUT)
+                if me_res.status_code == 200:
+                    self.user_id = me_res.json().get("result", {}).get("id", 1)
+
+                logger.info(
+                    "Successfully authenticated (User ID: %d) and obtained CSRF token.",
+                    self.user_id,
+                )
                 return True
             except requests.exceptions.RequestException as e:
                 logger.warning("Login attempt %d failed with error: %s", attempt, e)
@@ -184,6 +195,7 @@ class SupersetProvisioner:
             "database": db_id,
             "schema": schema,
             "table_name": table_name,
+            "owners": [self.user_id],
         }
         create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
         if create_res.status_code in (200, 201):
@@ -204,40 +216,8 @@ class SupersetProvisioner:
                         return ds.get("id")
             return None
 
-    def create_chart(
-        self, dataset_id: int, slice_name: str, viz_type: str, params: dict[str, Any]
-    ) -> int | None:
-        """Create an analytical chart in Superset."""
-        url = f"{self.base_url}/api/v1/chart/"
-        try:
-            res = self.session.get(url, timeout=REQUEST_TIMEOUT)
-            if res.status_code == 200:
-                for ch in res.json().get("result", []):
-                    if ch.get("slice_name") == slice_name:
-                        ch_id = ch.get("id")
-                        logger.info("Found existing chart '%s' (ID: %s)", slice_name, ch_id)
-                        return ch_id
-        except Exception as e:
-            logger.warning("Error fetching charts: %s", e)
-
-        payload = {
-            "slice_name": slice_name,
-            "datasource_id": dataset_id,
-            "datasource_type": "table",
-            "viz_type": viz_type,
-            "params": json.dumps(params),
-        }
-        create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
-        if create_res.status_code in (200, 201):
-            chart_id = create_res.json().get("id")
-            logger.info("Chart '%s' created successfully with ID %s", slice_name, chart_id)
-            return chart_id
-        else:
-            logger.warning("Chart creation failed for '%s': %s", slice_name, create_res.text)
-            return None
-
-    def create_dashboard(self, dashboard_title: str, chart_ids: list[int]) -> dict[str, Any] | None:
-        """Create or update a Superset dashboard and configure embedded access."""
+    def create_dashboard(self, dashboard_title: str) -> dict[str, Any] | None:
+        """Create or find a Superset dashboard and configure embedded access."""
         url = f"{self.base_url}/api/v1/dashboard/"
         dash_id: int | None = None
         dash_uuid: str | None = None
@@ -270,11 +250,13 @@ class SupersetProvisioner:
                 "dashboard_title": dashboard_title,
                 "published": True,
                 "slug": "transjakarta-transit-intelligence",
+                "owners": [self.user_id],
+                "position_json": "{}",
+                "json_metadata": json.dumps({"expanded_slices": {}, "refresh_frequency": 0}),
             }
             create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
             if create_res.status_code in (200, 201):
                 dash_id = create_res.json().get("id")
-                # Fetch created dashboard to get UUID
                 d_res = self.session.get(f"{url}{dash_id}", timeout=REQUEST_TIMEOUT)
                 if d_res.status_code == 200:
                     dash_uuid = d_res.json().get("result", {}).get("uuid")
@@ -282,8 +264,30 @@ class SupersetProvisioner:
                     "Created dashboard '%s' (ID: %s, UUID: %s)", dashboard_title, dash_id, dash_uuid
                 )
             else:
-                logger.warning("Failed to create dashboard: %s", create_res.text)
-                return None
+                logger.warning(
+                    "Dashboard creation failed (HTTP %d): %s", create_res.status_code, create_res.text
+                )
+                # Try without slug if slug conflict
+                simple_payload = {
+                    "dashboard_title": dashboard_title,
+                    "published": True,
+                    "owners": [self.user_id],
+                }
+                retry_res = self.session.post(url, json=simple_payload, timeout=REQUEST_TIMEOUT)
+                if retry_res.status_code in (200, 201):
+                    dash_id = retry_res.json().get("id")
+                    d_res = self.session.get(f"{url}{dash_id}", timeout=REQUEST_TIMEOUT)
+                    if d_res.status_code == 200:
+                        dash_uuid = d_res.json().get("result", {}).get("uuid")
+                    logger.info(
+                        "Created dashboard without slug '%s' (ID: %s, UUID: %s)",
+                        dashboard_title,
+                        dash_id,
+                        dash_uuid,
+                    )
+
+        if not dash_id:
+            return None
 
         # Enable embedded dashboard
         embed_url = f"{self.base_url}/api/v1/dashboard/{dash_id}/embedded"
@@ -304,12 +308,62 @@ class SupersetProvisioner:
                 logger.info(
                     "Embedded dashboard enabled successfully (Embedded UUID: %s)", embedded_uuid
                 )
+            else:
+                logger.warning(
+                    "Failed to enable embedded dashboard: (HTTP %d) %s",
+                    post_embed.status_code,
+                    post_embed.text,
+                )
 
         return {
             "dashboard_id": dash_id,
             "dashboard_uuid": dash_uuid,
             "embedded_uuid": embedded_uuid,
         }
+
+    def create_chart(
+        self,
+        dataset_id: int,
+        slice_name: str,
+        viz_type: str,
+        params: dict[str, Any],
+        dash_id: int | None = None,
+    ) -> int | None:
+        """Create an analytical chart in Superset."""
+        url = f"{self.base_url}/api/v1/chart/"
+        try:
+            res = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            if res.status_code == 200:
+                for ch in res.json().get("result", []):
+                    if ch.get("slice_name") == slice_name:
+                        ch_id = ch.get("id")
+                        logger.info("Found existing chart '%s' (ID: %s)", slice_name, ch_id)
+                        return ch_id
+        except Exception as e:
+            logger.warning("Error fetching charts: %s", e)
+
+        payload = {
+            "slice_name": slice_name,
+            "datasource_id": dataset_id,
+            "datasource_type": "table",
+            "viz_type": viz_type,
+            "params": json.dumps(params),
+            "owners": [self.user_id],
+            "dashboards": [dash_id] if dash_id else [],
+        }
+        create_res = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
+        if create_res.status_code in (200, 201):
+            chart_id = create_res.json().get("id")
+            logger.info("Chart '%s' created successfully with ID %s", slice_name, chart_id)
+            return chart_id
+        else:
+            logger.warning(
+                "Chart creation failed for '%s' (HTTP %d): %s",
+                slice_name,
+                create_res.status_code,
+                create_res.text,
+            )
+            return None
 
     def run(self):
         """Execute full provisioning workflow."""
@@ -323,19 +377,24 @@ class SupersetProvisioner:
         if not db_id:
             return {"status": "FAILED", "reason": "Could not connect database"}
 
-        # Register datasets
+        # 1. Register conformed datasets
         fact_ds_id = self.create_dataset(db_id, "warehouse", "fact_taps")
         stops_ds_id = self.create_dataset(db_id, "warehouse", "dim_stops")
         routes_ds_id = self.create_dataset(db_id, "warehouse", "dim_routes")
 
+        # 2. Create Dashboard First
+        dash_info = self.create_dashboard("TransJakarta Transit Intelligence Overview")
+        dash_id = dash_info.get("dashboard_id") if dash_info else None
+
         chart_ids = []
         if fact_ds_id:
-            # 1. Hourly Ridership Chart
+            # Chart 1: Hourly Ridership Chart
             c1 = self.create_chart(
-                fact_ds_id,
-                "Hourly Tap-In Ridership Pattern",
-                "echarts_timeseries_bar",
-                {
+                dataset_id=fact_ds_id,
+                slice_name="Hourly Tap-In Ridership Pattern",
+                viz_type="echarts_timeseries_bar",
+                params={
+                    "datasource": f"{fact_ds_id}__table",
                     "metrics": ["count"],
                     "groupby": ["tap_type"],
                     "adhoc_filters": [
@@ -346,54 +405,58 @@ class SupersetProvisioner:
                         }
                     ],
                 },
+                dash_id=dash_id,
             )
             if c1:
                 chart_ids.append(c1)
 
-            # 2. Card Bank Market Share
+            # Chart 2: Card Bank Market Share
             c2 = self.create_chart(
-                fact_ds_id,
-                "Payment Card Issuer Distribution",
-                "pie",
-                {
+                dataset_id=fact_ds_id,
+                slice_name="Payment Card Issuer Distribution",
+                viz_type="pie",
+                params={
+                    "datasource": f"{fact_ds_id}__table",
                     "metric": "count",
                     "groupby": ["pay_card_bank"],
                 },
+                dash_id=dash_id,
             )
             if c2:
                 chart_ids.append(c2)
 
-            # 3. Top Boarding Stops
+            # Chart 3: Top Boarding Stops
             c3 = self.create_chart(
-                fact_ds_id,
-                "Busiest Transit Boarding Stops",
-                "table",
-                {
+                dataset_id=fact_ds_id,
+                slice_name="Busiest Transit Boarding Stops",
+                viz_type="table",
+                params={
+                    "datasource": f"{fact_ds_id}__table",
                     "metrics": ["count"],
                     "groupby": ["stop_id", "corridor_code"],
                     "order_desc": True,
                     "row_limit": 10,
                 },
+                dash_id=dash_id,
             )
             if c3:
                 chart_ids.append(c3)
 
-            # 4. Weekday vs Weekend Pattern
+            # Chart 4: Weekday vs Weekend Pattern
             c4 = self.create_chart(
-                fact_ds_id,
-                "Ridership by Direction and Corridor",
-                "echarts_timeseries_bar",
-                {
+                dataset_id=fact_ds_id,
+                slice_name="Ridership by Direction and Corridor",
+                viz_type="echarts_timeseries_bar",
+                params={
+                    "datasource": f"{fact_ds_id}__table",
                     "metrics": ["count"],
                     "groupby": ["corridor_code"],
                     "row_limit": 15,
                 },
+                dash_id=dash_id,
             )
             if c4:
                 chart_ids.append(c4)
-
-        # Create Dashboard
-        dash_info = self.create_dashboard("TransJakarta Transit Intelligence Overview", chart_ids)
 
         summary = {
             "status": "SUCCESS",
