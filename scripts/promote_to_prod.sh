@@ -53,10 +53,12 @@ echo "======================================================================"
 echo ""
 echo "[Step 1/4] Executing dbt Quality Gate against local dev warehouse..."
 
-if command -v dbt >/dev/null 2>&1; then
-    (cd "${PROJECT_ROOT}/dbt" && dbt test --project-dir . --profiles-dir .)
-elif command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q "airflow-webserver"; then
-    docker exec koridortj-airflow-webserver-1 dbt test --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "airflow-webserver"; then
+    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep "airflow-webserver" | head -n 1)
+    echo "Running dbt test inside ${CONTAINER_NAME}..."
+    docker exec "${CONTAINER_NAME}" dbt test --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt
+elif command -v dbt >/dev/null 2>&1; then
+    (cd "${PROJECT_ROOT}/dbt" && POSTGRES_HOST="${DEV_PG_HOST}" dbt test --project-dir . --profiles-dir .)
 else
     echo "⚠️  Neither local dbt nor Airflow container available. Running mock quality check..."
 fi
@@ -85,7 +87,17 @@ for tbl in "${TABLES_TO_PROMOTE[@]}"; do
     TABLE_ARGS+=("-t" "${tbl}")
 done
 
-if command -v pg_dump >/dev/null 2>&1; then
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "postgres"; then
+    PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep "postgres" | head -n 1)
+    echo "Dumping tables via container ${PG_CONTAINER}..."
+    docker exec "${PG_CONTAINER}" pg_dump \
+        -U "${DEV_PG_USER}" \
+        -d "${DEV_PG_DB}" \
+        --no-owner \
+        --no-acl \
+        "${TABLE_ARGS[@]}" > "${DUMP_FILE}"
+    echo "✅ Warehouse tables dump completed (${DUMP_FILE})."
+elif command -v pg_dump >/dev/null 2>&1; then
     PGPASSWORD="${DEV_PG_PASSWORD}" pg_dump \
         -h "${DEV_PG_HOST}" \
         -p "${DEV_PG_PORT}" \
@@ -95,15 +107,6 @@ if command -v pg_dump >/dev/null 2>&1; then
         --no-acl \
         "${TABLE_ARGS[@]}" > "${DUMP_FILE}"
     echo "✅ Exported warehouse tables to ${DUMP_FILE}."
-else
-    echo "ℹ️  pg_dump not found on host path. Using docker exec if available..."
-    docker exec koridortj-postgres-1 pg_dump \
-        -U "${DEV_PG_USER}" \
-        -d "${DEV_PG_DB}" \
-        --no-owner \
-        --no-acl \
-        "${TABLE_ARGS[@]}" > "${DUMP_FILE}" || true
-    echo "✅ Warehouse tables dump completed (${DUMP_FILE})."
 fi
 
 # ------------------------------------------------------------------------------
@@ -149,10 +152,12 @@ fi
 # ------------------------------------------------------------------------------
 echo ""
 echo "[Step 4/4] Regenerating dbt documentation catalog and lineage..."
-if command -v dbt >/dev/null 2>&1; then
-    (cd "${PROJECT_ROOT}/dbt" && dbt docs generate --project-dir . --profiles-dir .)
-elif command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q "airflow-webserver"; then
-    docker exec koridortj-airflow-webserver-1 dbt docs generate --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "airflow-webserver"; then
+    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep "airflow-webserver" | head -n 1)
+    echo "Generating dbt docs inside ${CONTAINER_NAME}..."
+    docker exec "${CONTAINER_NAME}" dbt docs generate --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt
+elif command -v dbt >/dev/null 2>&1; then
+    (cd "${PROJECT_ROOT}/dbt" && POSTGRES_HOST="${DEV_PG_HOST}" dbt docs generate --project-dir . --profiles-dir .)
 fi
 echo "✅ dbt docs generated in dbt/target."
 
