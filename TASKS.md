@@ -51,7 +51,7 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Write `/docs/data_dictionary.md` and `/docs/erd.md` (Mermaid ERD)
 
 ## Phase 7 — BI / dashboard (VPS)
-- [ ] In Coolify, create a **production Postgres** database resource
+- [x] In Coolify, create a **production Postgres** database resource
 - [x] Stand up Superset via `docker-compose.prod.yml` (single worker, no Celery/Redis), connect to the **production** Postgres via a read-only role
 - [x] Build 3–5 dashboards (ridership by corridor/hour, weekday vs weekend, busiest stops, network map if feasible)
 - [x] Enable the `EMBEDDED_SUPERSET` feature flag and build the guest-token service (Python or Go)
