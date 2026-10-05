@@ -157,28 +157,28 @@ cd koridortj
 cp .env.example .env
 ```
 
-### 3. Launch Docker Compose Stack
-```bash
-# Start Core Platform (PostgreSQL, Kafka, Airflow, Superset, Token Service)
-docker compose up -d
+### 3. Launch Local Dev / Compute Stack
+The pipeline uses a two-environment architecture. The heavy data ingestion, Airflow orchestration, Kafka streaming, and dbt transformations run locally on your dev machine:
 
-# Check service health
-docker compose ps
+```bash
+# Start Local Dev Stack (PostgreSQL 16, Kafka KRaft, Airflow, Streaming Replay Workers)
+docker compose -f docker-compose.dev.yml up -d
+
+# Verify container health
+docker compose -f docker-compose.dev.yml ps
 ```
 
-### 4. Service Endpoints
+### 4. Local Service Endpoints
 
 | Service | Local URL | Credentials / Notes |
 |---|---|---|
-| **Public Web Portal & Stats API** | [http://localhost:8000](http://localhost:8000) | Public (Live KPI metrics, Chart.js analytics & embedded dashboard) |
-| **API Docs (Swagger UI)** | [http://localhost:8000/docs](http://localhost:8000/docs) | Interactive OpenAPI documentation |
-| **Apache Superset** | [http://localhost:8088](http://localhost:8088) | `admin` / `admin` |
-| **Apache Airflow UI** | [http://localhost:8080](http://localhost:8080) | `admin` / `admin` |
-| **PostgreSQL Warehouse** | `localhost:5432` | `warehouse` / `postgres` (`postgres_dev_password`) |
+| **Apache Airflow UI** | [http://localhost:8080](http://localhost:8080) | `admin` / `admin` (DAG orchestration & scheduling) |
+| **PostgreSQL Dev Warehouse** | `localhost:5432` | `warehouse` / `postgres` (`postgres_dev_password`) |
+| **Apache Kafka (KRaft)** | `localhost:9092` | Internal streaming broker (`taps.raw`, `taps.deadletter`) |
 
 ---
 
-## 🧪 Testing & Verification Runbook
+## 🧪 Testing & Local Verification Runbook
 
 ### Run Python Unit & Schema Tests
 ```bash
@@ -195,17 +195,16 @@ ruff check .
 ruff format --check .
 ```
 
-### Run dbt Models & Data Quality Tests
+### Trigger Pipeline DAGs & dbt Tests
 ```bash
-# Run dbt transformations
-dbt run --project-dir dbt --profiles-dir dbt
+# Trigger GTFS ingestion DAG
+docker compose -f docker-compose.dev.yml exec airflow-webserver airflow dags trigger gtfs_ingest
 
-# Execute 80 data quality tests
-dbt test --project-dir dbt --profiles-dir dbt
+# Trigger warehouse build DAG (dbt transformations & data quality tests)
+docker compose -f docker-compose.dev.yml exec airflow-webserver airflow dags trigger warehouse_build
 
-# Generate and serve interactive dbt documentation
-dbt docs generate --project-dir dbt --profiles-dir dbt
-dbt docs serve --project-dir dbt --profiles-dir dbt --port 8081
+# Or run dbt directly
+(cd dbt && dbt run && dbt test)
 ```
 
 ### Run Streaming Replay Producer & Consumer
@@ -219,9 +218,48 @@ python ingestion/tap_consumer.py --batch-size 250
 
 ---
 
-## 🚢 Production Deployment (Coolify VPS)
+## 🚀 Dev → Prod Promotion Pipeline & Cadence
 
-For step-by-step production deployment instructions, Traefik HTTPS domain routing, managed database setup, backup policies, and resource tuning, see the [Production Deployment Guide](docs/deployment_guide.md).
+KoridorTJ separates the heavy compute environment from the production serving layer. The promotion script is the sole, deliberate bridge connecting the local dev warehouse to the public demo on the VPS.
+
+### 📅 Promotion Cadence
+- **Manual Trigger**: Promotion is executed manually whenever you want the public demo and dashboard refreshed with a newly validated pipeline run.
+- **Not on Every Run**: Local Airflow DAGs run frequently during development without touching production. Only when a run satisfies all data quality checks do you promote the resulting star schema models to the VPS.
+
+### 🔄 Promotion Workflow (`./scripts/promote_to_prod.sh`)
+When executed from your local machine, the promotion script automatically carries out four gated phases:
+
+1. **Pre-promotion Quality Gate**: Re-runs all **80 dbt data tests** against your local dev PostgreSQL warehouse. If any test fails, the script **halts immediately** with a non-zero exit code and refuses to promote.
+2. **Conformed Model Dump**: Performs a clean, schema-isolated `pg_dump` of only the conformed dimensional tables (`dim_routes`, `dim_stops`, `dim_corridors`, `dim_calendar`, `fact_taps`), ignoring raw/staging tables.
+3. **SSH-Tunneled Streaming & Restore**: Connects securely over SSH to the VPS and streams the SQL dump directly into the production PostgreSQL container (`psql -v ON_ERROR_STOP=1`). It automatically grants read-only `SELECT` privileges to `superset_ro` and prints restored row counts for verification.
+4. **dbt Docs Regeneration & Static Publishing**: Executes `dbt docs generate`, stages the static artifacts (`index.html`, `manifest.json`, `catalog.json`) into `web/dbt_docs/`, and streams the updated catalog directly to the production `token-service` container at `/app/web/dbt_docs/`.
+
+### 💻 Executing the Promotion
+```bash
+# Ensure PROD_SSH_HOST and production credentials are set in .env
+./scripts/promote_to_prod.sh
+```
+
+---
+
+## 🚢 Production Serving Layer (Coolify VPS)
+
+The production serving layer is deployed via **Coolify** on a lightweight VPS (1 vCPU / 2GB RAM budget) using [`docker-compose.prod.yml`](docker-compose.prod.yml):
+
+- **Production PostgreSQL 16**: Managed resource in Coolify hosting `warehouse` and `superset_meta`.
+- **Apache Superset 4.0.1**: Lean single-worker container (`WEB_CONCURRENCY=1`, memory capped at 768MB) with read-only database access.
+- **FastAPI Guest Token & Web Portal**: Issues short-lived JWT guest tokens for dashboard embedding, serves real-time KPI aggregates, and hosts the interactive web portal and compiled `dbt docs`.
+
+### Production Endpoints
+
+| Service / View | URL / Routing | Purpose |
+|---|---|---|
+| **Public Web Portal & Dashboard** | `https://koridortj.yourdomain.com` | Live analytics portal & embedded Superset dashboard |
+| **Interactive dbt Docs & Lineage** | `https://koridortj.yourdomain.com/dbt_docs/` | Static dbt data catalog, lineage graph, and data dictionary |
+| **Live Telemetry & Stats API** | `https://koridortj.yourdomain.com/api/stats` | JSON analytics aggregates from production warehouse |
+| **API Documentation (Swagger UI)** | `https://koridortj.yourdomain.com/docs` | Interactive OpenAPI documentation |
+
+For step-by-step production deployment instructions, Traefik HTTPS domain routing, and security hardening, see the [Production Deployment Guide](docs/deployment_guide.md).
 
 ---
 
