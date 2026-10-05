@@ -61,7 +61,7 @@ No dates attached — work through phases in order when you have time. Each phas
 ## Phase 8 — Dev → prod promotion pipeline
 - [x] Write `scripts/promote_to_prod.sh`: re-run `dbt test` as a final gate, `pg_dump` the finished warehouse tables, SSH-tunnel to the VPS, `pg_restore` into production
 - [x] Add a step to regenerate `dbt docs` and publish the static output to wherever the VPS serves it
-- [ ] Test the failure path: intentionally break a dbt test and confirm the script refuses to promote
+- [x] Test the failure path: intentionally break a dbt test and confirm the script refuses to promote
 - [x] Document the promotion cadence in the README (manual, whenever you want the public demo refreshed)
 
 ## Phase 9 — CI/CD
