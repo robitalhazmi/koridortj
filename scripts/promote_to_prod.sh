@@ -93,6 +93,8 @@ if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "postgres"; then
     docker exec "${PG_CONTAINER}" pg_dump \
         -U "${DEV_PG_USER}" \
         -d "${DEV_PG_DB}" \
+        --clean \
+        --if-exists \
         --no-owner \
         --no-acl \
         "${TABLE_ARGS[@]}" > "${DUMP_FILE}"
@@ -103,6 +105,8 @@ elif command -v pg_dump >/dev/null 2>&1; then
         -p "${DEV_PG_PORT}" \
         -U "${DEV_PG_USER}" \
         -d "${DEV_PG_DB}" \
+        --clean \
+        --if-exists \
         --no-owner \
         --no-acl \
         "${TABLE_ARGS[@]}" > "${DUMP_FILE}"
@@ -134,8 +138,15 @@ else
             exit 1
         fi
         echo \"✅ Located production PostgreSQL container: \${PG_CONTAINER}\"
+        echo \"Ensuring schema 'warehouse' exists in database '${PROD_PG_DB}'...\"
+        docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"CREATE SCHEMA IF NOT EXISTS warehouse;\"
         echo \"Restoring into database '${PROD_PG_DB}' as user '${PROD_PG_USER}'...\"
         docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\"
+        echo \"Granting read-only permissions to superset_ro on restored tables...\"
+        docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"
+            GRANT USAGE ON SCHEMA warehouse TO superset_ro;
+            GRANT SELECT ON ALL TABLES IN SCHEMA warehouse TO superset_ro;
+        \"
         echo '✅ Production warehouse tables restored successfully.'
     " < "${DUMP_FILE}"
 
