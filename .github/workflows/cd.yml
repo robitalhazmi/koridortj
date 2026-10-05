@@ -90,6 +90,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # 5. Serving Superset Image (with baked-in config and entrypoint)
+      - name: Build and Push Superset Serving Node
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.superset
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-superset:latest
+            ghcr.io/${{ steps.repo_meta.outputs.owner_lc }}/koridortj-superset:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy-coolify:
     name: Trigger Coolify Zero-Downtime Deployment
     runs-on: ubuntu-latest
