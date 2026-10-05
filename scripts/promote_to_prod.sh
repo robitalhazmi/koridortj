@@ -113,6 +113,11 @@ elif command -v pg_dump >/dev/null 2>&1; then
     echo "✅ Exported warehouse tables to ${DUMP_FILE}."
 fi
 
+if [[ ! -s "${DUMP_FILE}" ]]; then
+    echo "❌ Error: Dump file ${DUMP_FILE} is empty or was not created." >&2
+    exit 1
+fi
+
 # ------------------------------------------------------------------------------
 # Step 3: Restore to Production Postgres via Direct SSH Streaming
 # ------------------------------------------------------------------------------
@@ -129,7 +134,7 @@ else
 
     echo "Streaming ${DUMP_FILE} directly to VPS (${PROD_SSH_USER}@${PROD_SSH_HOST}:${PROD_SSH_PORT})..."
     ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" "
-        set -e
+        set -euo pipefail
         PG_CONTAINER=\$(docker ps --format '{{.Names}} {{.Image}}' | grep -iE 'postgres' | awk '{print \$1}' | head -n 1)
         if [ -z \"\${PG_CONTAINER}\" ]; then
             echo '❌ Could not find PostgreSQL container on VPS.' >&2
@@ -139,14 +144,31 @@ else
         fi
         echo \"✅ Located production PostgreSQL container: \${PG_CONTAINER}\"
         echo \"Ensuring schema 'warehouse' exists in database '${PROD_PG_DB}'...\"
-        docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"CREATE SCHEMA IF NOT EXISTS warehouse;\"
+        docker exec \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"CREATE SCHEMA IF NOT EXISTS warehouse;\" < /dev/null
+
         echo \"Restoring into database '${PROD_PG_DB}' as user '${PROD_PG_USER}'...\"
-        docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\"
+        docker exec -i \"\${PG_CONTAINER}\" psql -v ON_ERROR_STOP=1 -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\"
+
         echo \"Granting read-only permissions to superset_ro on restored tables...\"
-        docker exec -i \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"
+        docker exec \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"
             GRANT USAGE ON SCHEMA warehouse TO superset_ro;
             GRANT SELECT ON ALL TABLES IN SCHEMA warehouse TO superset_ro;
-        \"
+            ALTER DEFAULT PRIVILEGES IN SCHEMA warehouse GRANT SELECT ON TABLES TO superset_ro;
+        \" < /dev/null
+
+        echo \"Verifying promoted table row counts in database '${PROD_PG_DB}'...\"
+        docker exec \"\${PG_CONTAINER}\" psql -U \"${PROD_PG_USER}\" -d \"${PROD_PG_DB}\" -c \"
+            SELECT 'dim_routes' AS table_name, count(*) AS row_count FROM warehouse.dim_routes
+            UNION ALL
+            SELECT 'dim_stops', count(*) FROM warehouse.dim_stops
+            UNION ALL
+            SELECT 'dim_corridors', count(*) FROM warehouse.dim_corridors
+            UNION ALL
+            SELECT 'dim_calendar', count(*) FROM warehouse.dim_calendar
+            UNION ALL
+            SELECT 'fact_taps', count(*) FROM warehouse.fact_taps;
+        \" < /dev/null
+
         echo '✅ Production warehouse tables restored successfully.'
     " < "${DUMP_FILE}"
 
@@ -162,10 +184,13 @@ if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "airflow-webserver"; th
     CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep "airflow-webserver" | head -n 1)
     echo "Generating dbt docs inside ${CONTAINER_NAME}..."
     docker exec "${CONTAINER_NAME}" dbt docs generate --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt
+    echo "✅ dbt docs generated in Airflow container."
 elif command -v dbt >/dev/null 2>&1; then
     (cd "${PROJECT_ROOT}/dbt" && POSTGRES_HOST="${DEV_PG_HOST}" dbt docs generate --project-dir . --profiles-dir .)
+    echo "✅ dbt docs generated in dbt/target."
+else
+    echo "⚠️  Skipping dbt docs generation (dbt not found locally or in Airflow container)."
 fi
-echo "✅ dbt docs generated in dbt/target."
 
 echo ""
 echo "======================================================================"
