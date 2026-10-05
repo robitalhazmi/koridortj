@@ -98,3 +98,12 @@ docker compose -f docker-compose.dev.yml exec airflow-webserver airflow dags tri
 # 3. Once test gate is verified green, promote finalized models to production:
 ./scripts/promote_to_prod.sh
 ```
+
+---
+
+## 4. Data Provenance & Governance Notice
+
+- **Reference Transit Network**: Ingested directly from official PT Transportasi Jakarta open GTFS feeds (CC BY 4.0).
+- **Passenger Tap Fact Data**: Synthetic / simulated transactions generated for portfolio analytics demonstration (`is_simulated = TRUE`).
+- **Production Compliance**: All production endpoints, dashboards, and embedded web portal views enforce and display the simulated data disclaimer.
+
