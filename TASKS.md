@@ -75,7 +75,7 @@ No dates attached — work through phases in order when you have time. Each phas
 - [x] Finish `README.md`: architecture diagram, quick start (both compose files + promotion script), links to dbt docs + public dashboard
 - [ ] Record a short screen-capture GIF/video of the dashboard and DAGs for the README
 - [x] Proofread all docs for the "simulated data" disclaimer consistency
-- [ ] Tag a `v1.0` release on GitHub
+- [x] Tag a `v1.0` release on GitHub
 
 ---
 
