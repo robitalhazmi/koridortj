@@ -4,6 +4,7 @@
 [![CD Pipeline](https://github.com/robitalhazmi/koridortj/actions/workflows/cd.yml/badge.svg)](https://github.com/robitalhazmi/koridortj/actions/workflows/cd.yml)
 [![dbt Tests](https://img.shields.io/badge/dbt_tests-80_passed-brightgreen.svg)](dbt/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![SQL: SQLFluff](https://img.shields.io/badge/sql-sqlfluff-blueviolet.svg)](dbt/models/)
 [![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
