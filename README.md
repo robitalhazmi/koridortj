@@ -20,6 +20,14 @@ KoridorTJ ingests official open transit feeds (GTFS routes, stops, schedules), c
 
 ---
 
+## 🎬 Platform Demo & UI Walkthrough
+
+![KoridorTJ Platform Demo](docs/assets/koridortj_demo.gif)
+
+*Live analytics portal with real-time telemetry, embedded Superset charts, Apache Airflow ETL DAG orchestration, and interactive dbt lineage catalog.*
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```mermaid

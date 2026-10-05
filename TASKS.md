@@ -73,7 +73,7 @@ No dates attached — work through phases in order when you have time. Each phas
 
 ## Phase 10 — Documentation & polish
 - [x] Finish `README.md`: architecture diagram, quick start (both compose files + promotion script), links to dbt docs + public dashboard
-- [ ] Record a short screen-capture GIF/video of the dashboard and DAGs for the README
+- [x] Record a short screen-capture GIF/video of the dashboard and DAGs for the README
 - [x] Proofread all docs for the "simulated data" disclaimer consistency
 - [x] Tag a `v1.0` release on GitHub
 

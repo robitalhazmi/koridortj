@@ -79,10 +79,13 @@ flowchart LR
 
 ## 6. How to explore it
 
-- Public dashboard: *(add your public embed page URL here once deployed)* — reflects the most recently **promoted** run, not a live feed
-- Data catalog / lineage: *(add your hosted dbt docs URL here)*
-- Architecture diagram & ERD: `/docs/architecture.md`, `/docs/erd.md`
-- Build status: GitHub Actions badge in the repo README
+![KoridorTJ Walkthrough Demo](docs/assets/koridortj_demo.gif)
+
+- **Public dashboard**: Hosted live analytics and Superset embedded views reflecting the most recently **promoted** warehouse run.
+- **Data catalog / Lineage graph**: Hosted at `/dbt_docs/` for interactive lineage and model exploration.
+- **Airflow Orchestration**: Local dev environment running `gtfs_ingest` and `warehouse_build` DAGs.
+- **Architecture & ERD**: See [`docs/architecture.md`](docs/architecture.md) and [`docs/erd.md`](docs/erd.md).
+- **Build Status**: GitHub Actions CI/CD workflows with automated linting, test suites, and Docker image builds.
 
 ## 7. Quick start
 
