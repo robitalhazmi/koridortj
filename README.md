@@ -24,44 +24,61 @@ KoridorTJ ingests official open transit feeds (GTFS routes, stops, schedules), c
 
 ```mermaid
 flowchart TD
-    subgraph Sources ["1. Data Sources & Landing"]
-        GTFS["Official TransJakarta GTFS Feed<br/>(routes, stops, trips, calendar)"]
-        TapsHist["Simulated Tap Dataset<br/>(37,900 Historical Trips)"]
+    subgraph DevEnv ["💻 Environment 1: Local Dev / Compute Stack (docker-compose.dev.yml)"]
+        subgraph Sources ["1. Data Sources & Landing"]
+            GTFS["Official TransJakarta GTFS Feed<br/>(routes, stops, trips, calendar)"]
+            TapsHist["Simulated Tap Dataset<br/>(37,900 Historical Trips)"]
+        end
+
+        subgraph Streaming ["2. Real-Time Streaming (Kafka KRaft)"]
+            Producer["Replay Producer<br/>(Speed Multiplier: 60x)"]
+            Kafka["Kafka KRaft Broker<br/>Topic: taps.raw"]
+            DLQ["Dead-Letter Topic<br/>Topic: taps.deadletter"]
+            Consumer["Tap Consumer<br/>(Pydantic Validation)"]
+        end
+
+        subgraph Orchestration ["3. Orchestration (Apache Airflow)"]
+            DAG1["DAG: gtfs_ingest<br/>(Weekly Reference Sync)"]
+            DAG2["DAG: warehouse_build<br/>(Nightly dbt Run & Test)"]
+        end
+
+        subgraph LocalWarehouse ["4. Local Dev Warehouse (PostgreSQL 16 & dbt Core)"]
+            Raw["raw Schema<br/>• gtfs_routes (240)<br/>• gtfs_stops (8,091)<br/>• gtfs_trips (700)<br/>• gtfs_calendar (7)<br/>• taps (37,900)<br/>• taps_stream"]
+            Staging["staging Schema<br/>• stg_routes, stg_stops<br/>• stg_trips, stg_calendar<br/>• stg_taps, stg_streaming_taps"]
+            StarSchema["warehouse Star Schema<br/>• dim_routes (270)<br/>• dim_stops (8,445)<br/>• dim_corridors (270)<br/>• dim_calendar (1,096)<br/>• fact_taps (72,300)"]
+        end
+
+        GTFS --> DAG1 --> Raw
+        TapsHist --> Raw
+        TapsHist --> Producer --> Kafka --> Consumer --> Raw
+        Consumer -.->|Invalid Events| DLQ
+        DAG2 --> Staging --> StarSchema
     end
 
-    subgraph Streaming ["2. Real-Time Streaming (Kafka)"]
-        Producer["Replay Producer<br/>(Speed Multiplier: 60x)"]
-        Kafka["Apache Kafka (KRaft Broker)<br/>Topic: taps.raw"]
-        DLQ["Dead-Letter Topic<br/>taps.deadletter"]
-        Consumer["Tap Consumer<br/>(Pydantic Validation)"]
+    subgraph Bridge ["🚀 Promotion Bridge (scripts/promote_to_prod.sh)"]
+        Gate["Quality Gate<br/>(80 dbt Tests Passing)"]
+        Dump["pg_dump<br/>(Conformed Star Schema)"]
+        Tunnel["SSH Stream & Restore<br/>(psql -v ON_ERROR_STOP=1)"]
+        DocsSync["Static Docs Sync<br/>(dbt docs generate)"]
+        Gate --> Dump --> Tunnel
+        Gate --> DocsSync
     end
 
-    subgraph Orchestration ["3. Orchestration (Airflow)"]
-        DAG1["DAG: gtfs_ingest<br/>(Weekly Reference Sync)"]
-        DAG2["DAG: warehouse_build<br/>(Nightly dbt Run & Test)"]
+    subgraph ProdEnv ["☁️ Environment 2: VPS Serving Layer (docker-compose.prod.yml)"]
+        ProdPG["Production PostgreSQL 16<br/>(Coolify Managed Resource)<br/>• Schema: warehouse<br/>• Schema: superset_meta"]
+        Superset["Apache Superset 4.0.1<br/>(Lean 1-Worker Node, superset_ro)"]
+        TokenAPI["FastAPI Token Microservice<br/>(JWT HS256 Minting & Telemetry API)"]
+        WebPortal["Public Web Portal<br/>• Live Analytics & KPIs<br/>• Embedded Superset Dashboard<br/>• Static dbt Docs (/dbt_docs/)"]
+
+        ProdPG --> Superset
+        ProdPG --> TokenAPI
+        Superset -.->|Guest Token Embed| WebPortal
+        TokenAPI -->|Guest JWT & Telemetry| WebPortal
     end
 
-    subgraph Warehouse ["4. Analytics Warehouse (PostgreSQL & dbt)"]
-        Raw["raw Schema<br/>• raw.gtfs_routes (240)<br/>• raw.gtfs_stops (8,091)<br/>• raw.gtfs_trips (700)<br/>• raw.gtfs_calendar (7)<br/>• raw.taps (37,900)<br/>• raw.taps_stream"]
-        Staging["staging Schema<br/>• stg_routes<br/>• stg_stops<br/>• stg_trips<br/>• stg_calendar<br/>• stg_taps<br/>• stg_streaming_taps"]
-        StarSchema["warehouse Star Schema<br/>• dim_routes (270)<br/>• dim_stops (8,445)<br/>• dim_corridors (270)<br/>• dim_calendar (1,096)<br/>• fact_taps (72,300)"]
-    end
-
-    subgraph Serving ["5. Serving & Business Intelligence"]
-        Superset["Apache Superset 4.0.1<br/>(Read-Only Warehouse Access)"]
-        TokenAPI["FastAPI Guest-Token Service<br/>(JWT HS256 Minting & Stats API)"]
-        WebPortal["Public Web Portal<br/>(Live Telemetry & Superset Embed)"]
-    end
-
-    GTFS --> DAG1 --> Raw
-    TapsHist --> Raw
-    TapsHist --> Producer --> Kafka --> Consumer --> Raw
-    Consumer -.->|Invalid Events| DLQ
-    DAG2 --> Staging --> StarSchema
-    StarSchema --> Superset
-    StarSchema --> TokenAPI
-    Superset -.->|Embedded SDK| WebPortal
-    TokenAPI -->|Guest JWT & KPIs| WebPortal
+    StarSchema --> Gate
+    Tunnel --> ProdPG
+    DocsSync --> WebPortal
 ```
 
 ---
