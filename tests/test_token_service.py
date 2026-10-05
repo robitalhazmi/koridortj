@@ -66,3 +66,10 @@ class TestGuestTokenService:
         assert response_svg.status_code in (200, 204)
         if response_svg.status_code == 200:
             assert "image/svg+xml" in response_svg.headers.get("content-type", "")
+
+    def test_dbt_docs_endpoint(self):
+        response = client.get("/dbt_docs/index.html")
+        assert response.status_code in (200, 404)
+        if response.status_code == 200:
+            assert "text/html" in response.headers.get("content-type", "")
+            assert "dbt" in response.text.lower()

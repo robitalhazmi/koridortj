@@ -179,7 +179,7 @@ fi
 # Step 4: Regenerate and Publish dbt Documentation
 # ------------------------------------------------------------------------------
 echo ""
-echo "[Step 4/4] Regenerating dbt documentation catalog and lineage..."
+echo "[Step 4/4] Regenerating and publishing dbt documentation catalog..."
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "airflow-webserver"; then
     CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep "airflow-webserver" | head -n 1)
     echo "Generating dbt docs inside ${CONTAINER_NAME}..."
@@ -190,6 +190,32 @@ elif command -v dbt >/dev/null 2>&1; then
     echo "✅ dbt docs generated in dbt/target."
 else
     echo "⚠️  Skipping dbt docs generation (dbt not found locally or in Airflow container)."
+fi
+
+# Stage generated static files into web/dbt_docs
+WEB_DOCS_DIR="${PROJECT_ROOT}/web/dbt_docs"
+mkdir -p "${WEB_DOCS_DIR}"
+if [[ -f "${PROJECT_ROOT}/dbt/target/index.html" ]]; then
+    cp "${PROJECT_ROOT}/dbt/target/index.html" "${WEB_DOCS_DIR}/index.html"
+    cp "${PROJECT_ROOT}/dbt/target/manifest.json" "${WEB_DOCS_DIR}/manifest.json"
+    cp "${PROJECT_ROOT}/dbt/target/catalog.json" "${WEB_DOCS_DIR}/catalog.json"
+    echo "✅ Staged dbt static documentation in web/dbt_docs/."
+fi
+
+# Publish static documentation to VPS token-service container if SSH configured
+if [[ -n "${PROD_SSH_HOST}" && -d "${WEB_DOCS_DIR}" && -f "${WEB_DOCS_DIR}/index.html" ]]; then
+    echo "Publishing dbt docs to production token-service container on VPS..."
+    tar -C "${WEB_DOCS_DIR}" -czf - . | ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" "
+        set -euo pipefail
+        TOKEN_CONTAINER=\$(docker ps --format '{{.Names}} {{.Image}}' | grep -iE 'token-service' | awk '{print \$1}' | head -n 1)
+        if [ -n \"\${TOKEN_CONTAINER}\" ]; then
+            docker exec \"\${TOKEN_CONTAINER}\" mkdir -p /app/web/dbt_docs
+            docker exec -i \"\${TOKEN_CONTAINER}\" tar -xzf - -C /app/web/dbt_docs
+            echo '✅ Published dbt docs to /app/web/dbt_docs in token-service container on VPS.'
+        else
+            echo '⚠️  Token service container not found on VPS. dbt docs staged locally in web/dbt_docs/.'
+        fi
+    "
 fi
 
 echo ""
