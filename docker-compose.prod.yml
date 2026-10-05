@@ -64,8 +64,6 @@ services:
       SUPERSET_DASHBOARD_ID: ${SUPERSET_DASHBOARD_ID:-45d44fda-4e9c-4a88-894d-819f66fbfd33}
       SUPERSET_GUEST_TOKEN_JWT_SECRET: ${SUPERSET_GUEST_TOKEN_JWT_SECRET:-koridortj_guest_token_jwt_secret_abcdef123456}
       SUPERSET_GUEST_TOKEN_JWT_AUDIENCE: ${SUPERSET_GUEST_TOKEN_JWT_AUDIENCE:-koridortj-superset}
-    volumes:
-      - ./web:/app/web:ro
     logging:
       driver: "json-file"
       options:
