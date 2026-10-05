@@ -33,10 +33,8 @@ filterwarnings = [
 
 [tool.sqlfluff.core]
 dialect = "postgres"
-templater = "dbt"
+templater = "jinja"
 max_line_length = 120
-exclude_rules = "L031,L034"
+exclude_rules = "RF04,ST06"
 
-[tool.sqlfluff.templater.dbt]
-project_dir = "./dbt"
-profiles_dir = "./dbt"
+

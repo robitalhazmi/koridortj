@@ -14,7 +14,7 @@ corridors_from_routes as (
         coalesce(nullif(max(route_long_name), ''), max(route_short_name), route_id) as corridor_name,
         0 as direction
     from {{ ref('stg_routes') }}
-    where route_id not in (select corridor_code from corridors_from_taps)
+    where route_id not in (select corridors_from_taps.corridor_code from corridors_from_taps)
     group by route_id
 ),
 
@@ -23,12 +23,17 @@ unknown_corridor as (
         'UNKNOWN' as corridor_code,
         'Unknown Corridor' as corridor_name,
         0 as direction
-    where not exists (
-        select 1 from corridors_from_taps where corridor_code = 'UNKNOWN'
-    )
-    and not exists (
-        select 1 from corridors_from_routes where corridor_code = 'UNKNOWN'
-    )
+    where
+        not exists (
+            select 1
+            from corridors_from_taps
+            where corridors_from_taps.corridor_code = 'UNKNOWN'
+        )
+        and not exists (
+            select 1
+            from corridors_from_routes
+            where corridors_from_routes.corridor_code = 'UNKNOWN'
+        )
 ),
 
 unioned as (

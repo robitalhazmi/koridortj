@@ -13,11 +13,12 @@ transformed as (
         extract(quarter from full_date)::int as quarter,
         extract(month from full_date)::int as month,
         extract(day from full_date)::int as day_of_month,
-        case when extract(isodow from full_date) in (6, 7) then true else false end as is_weekend,
-        case when (extract(month from full_date) = 1 and extract(day from full_date) = 1)
-                  or (extract(month from full_date) = 8 and extract(day from full_date) = 17)
-                  or (extract(month from full_date) = 12 and extract(day from full_date) = 25)
-             then true else false end as is_holiday
+        extract(isodow from full_date) in (6, 7) as is_weekend,
+        (
+            (extract(month from full_date) = 1 and extract(day from full_date) = 1)
+            or (extract(month from full_date) = 8 and extract(day from full_date) = 17)
+            or (extract(month from full_date) = 12 and extract(day from full_date) = 25)
+        ) as is_holiday
     from date_series
 )
 

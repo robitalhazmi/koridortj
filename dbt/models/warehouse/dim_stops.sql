@@ -24,7 +24,7 @@ tap_stops as (
         0 as wheelchair_boarding,
         min(_ingested_at) as _ingested_at
     from {{ ref('stg_taps') }}
-    where stop_id not in (select stop_id from gtfs_stops)
+    where stop_id not in (select gtfs_stops.stop_id from gtfs_stops)
     group by stop_id, stop_name
 ),
 

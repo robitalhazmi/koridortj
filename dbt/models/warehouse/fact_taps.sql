@@ -71,8 +71,7 @@ deduped as (
         is_simulated,
         _ingested_at
     from unioned
-    order by tap_id, _ingested_at desc
+    order by tap_id asc, _ingested_at desc
 )
 
 select * from deduped
-

@@ -26,7 +26,7 @@ tap_routes as (
         max(corridor_code) as corridor_code,
         min(_ingested_at) as _ingested_at
     from {{ ref('stg_taps') }}
-    where route_id not in (select route_id from gtfs_routes)
+    where route_id not in (select gtfs_routes.route_id from gtfs_routes)
     group by route_id
 ),
 
@@ -42,12 +42,17 @@ unknown_route as (
         '#FFFFFF' as route_text_color,
         'UNKNOWN' as corridor_code,
         now() as _ingested_at
-    where not exists (
-        select 1 from gtfs_routes where route_id = 'UNKNOWN'
-    )
-    and not exists (
-        select 1 from tap_routes where route_id = 'UNKNOWN'
-    )
+    where
+        not exists (
+            select 1
+            from gtfs_routes
+            where gtfs_routes.route_id = 'UNKNOWN'
+        )
+        and not exists (
+            select 1
+            from tap_routes
+            where tap_routes.route_id = 'UNKNOWN'
+        )
 ),
 
 unioned as (
