@@ -292,6 +292,7 @@ For step-by-step production deployment instructions, Traefik HTTPS domain routin
 ## 📚 Documentation Index
 
 - [Walkthrough & Architecture Story](WALKTHROUGH.md)
+- [System Architecture & System Design](docs/architecture.md)
 - [Technical Implementation Plan](IMPLEMENTATION_PLAN.md)
 - [Development Task Checklist](TASKS.md)
 - [Data Sources & Provenance](docs/data_sources.md)
