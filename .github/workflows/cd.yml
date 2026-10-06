@@ -119,39 +119,64 @@ jobs:
           COOLIFY_FQDN: ${{ secrets.COOLIFY_FQDN }}
           COOLIFY_RESOURCE_UUID: ${{ secrets.COOLIFY_RESOURCE_UUID }}
         run: |
+          AUTH_HEADER=()
+          if [ -n "$COOLIFY_API_TOKEN" ]; then
+            AUTH_HEADER=(-H "Authorization: Bearer ${COOLIFY_API_TOKEN}")
+          fi
+
           if [ -n "$COOLIFY_WEBHOOK_URL" ]; then
-            echo "Triggering deployment via Coolify Webhook..."
-            # Try POST first, fallback to GET if not 2xx
-            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$COOLIFY_WEBHOOK_URL" 2>/dev/null)
-            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            echo "Triggering deployment via Coolify Webhook URL..."
+            
+            # Attempt POST request
+            RAW_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "${AUTH_HEADER[@]}" -H "Content-Type: application/json" "$COOLIFY_WEBHOOK_URL" 2>/dev/null)
+            HTTP_CODE=$(echo "$RAW_RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            BODY=$(echo "$RAW_RESPONSE" | sed '/HTTP_STATUS:/d')
+            
             if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 400 ]; then
-              echo "POST returned $HTTP_CODE, trying GET..."
-              RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$COOLIFY_WEBHOOK_URL" 2>/dev/null)
-              HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+              echo "POST returned status $HTTP_CODE, trying GET..."
+              RAW_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "${AUTH_HEADER[@]}" "$COOLIFY_WEBHOOK_URL" 2>/dev/null)
+              HTTP_CODE=$(echo "$RAW_RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+              BODY=$(echo "$RAW_RESPONSE" | sed '/HTTP_STATUS:/d')
             fi
-            echo "Webhook response status: $HTTP_CODE"
+
+            echo "Response HTTP Status: $HTTP_CODE"
+            if [ -n "$BODY" ]; then
+              echo "Response Body: $BODY"
+            fi
+
             if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
-              echo "✅ Deployment triggered successfully on Coolify VPS via Webhook!"
+              echo "✅ Deployment triggered successfully on Coolify VPS!"
             else
-              echo "⚠️ Warning: Coolify webhook returned status $HTTP_CODE. Check your COOLIFY_WEBHOOK_URL."
+              echo "⚠️ Error: Coolify returned HTTP status $HTTP_CODE"
+              if [ "$HTTP_CODE" = "401" ]; then
+                echo "ℹ️ Note: 401 Unauthorized indicates that this endpoint requires an API Bearer token."
+                echo "   Please add COOLIFY_API_TOKEN to GitHub Secrets (generated from Coolify -> Keys & Tokens -> API tokens)."
+              fi
               exit 1
             fi
           elif [ -n "$COOLIFY_API_TOKEN" ] && [ -n "$COOLIFY_RESOURCE_UUID" ]; then
             COOLIFY_URL="${COOLIFY_FQDN:-https://app.coolify.io}"
             echo "Triggering deployment via Coolify REST API (${COOLIFY_URL})..."
-            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
+            RAW_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
               -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${COOLIFY_RESOURCE_UUID}" \
               -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
               -H "Content-Type: application/json")
-            HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
-            echo "API response status: $HTTP_CODE"
+            HTTP_CODE=$(echo "$RAW_RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            BODY=$(echo "$RAW_RESPONSE" | sed '/HTTP_STATUS:/d')
+            
+            echo "Response HTTP Status: $HTTP_CODE"
+            if [ -n "$BODY" ]; then
+              echo "Response Body: $BODY"
+            fi
+
             if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
               echo "✅ Deployment triggered successfully on Coolify VPS via API!"
             else
-              echo "⚠️ Warning: Coolify API returned status $HTTP_CODE"
+              echo "⚠️ Error: Coolify API returned status $HTTP_CODE"
+              exit 1
             fi
           else
             echo "ℹ️ Neither COOLIFY_WEBHOOK_URL nor COOLIFY_API_TOKEN is configured in GitHub Secrets."
             echo "   Serving-layer images were successfully built and published to GHCR."
-            echo "   To enable automated VPS redeploys, add COOLIFY_WEBHOOK_URL or COOLIFY_API_TOKEN to repository secrets."
+            echo "   To enable automated VPS redeploys, add COOLIFY_WEBHOOK_URL (or COOLIFY_API_TOKEN + COOLIFY_RESOURCE_UUID) to repository secrets."
           fi
