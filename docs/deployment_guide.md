@@ -93,9 +93,13 @@ To enable continuous zero-downtime deployments on the VPS whenever you push chan
    - Click **New repository secret** and add:
      - Name: `COOLIFY_WEBHOOK_URL`
      - Value: *(paste the Deploy Webhook URL from Coolify)*
+   - **Adding Bearer Authentication (for Coolify v4 API endpoints)**:
+     - If the endpoint requires authentication, add a second GitHub secret:
+       - Name: `COOLIFY_API_TOKEN`
+       - Value: *(paste token created from Coolify -> Keys & Tokens -> API Tokens with Deploy permissions)*
    - **How it works**:
      - When you push to `main`, GitHub Actions first runs the full **CI test suite** (Ruff linter, SQLFluff, Pytest, and 80 ephemeral dbt tests).
-     - Upon CI success, GitHub Actions automatically builds updated serving-layer container images and hits `COOLIFY_WEBHOOK_URL` to trigger redeployment on your VPS.
+     - Upon CI success, GitHub Actions automatically builds updated serving-layer container images and hits `COOLIFY_WEBHOOK_URL` with the Bearer token to trigger redeployment on your VPS.
 
 2. **Option B: Coolify Direct Git Auto-Deploy**:
    - In Coolify, under the Application's **General** settings, toggle **Auto Deploy** to **Enabled**.
