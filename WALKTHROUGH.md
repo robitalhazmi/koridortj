@@ -9,11 +9,11 @@
 
 KoridorTJ is an end-to-end data platform built around Jakarta's Transjakarta BRT network. It ingests **real, official Transjakarta open transit data** (routes, stops, schedules), combines it with a **publicly available, clearly-labeled simulated tap-in/tap-out transaction dataset**, and turns both into a governed, tested, documented analytics warehouse with a public dashboard.
 
-It's deliberately shaped to mirror what a data engineering team at a transportation company like Blue Bird actually does day to day: pull data from multiple sources on a schedule, model it into a clean warehouse, guard it with data quality checks, document it so analysts can self-serve, and ship it through CI/CD to a real running environment — not just a Jupyter notebook.
+It's deliberately shaped to mirror what a data engineering team at a transportation company does day to day: pull data from multiple sources on a schedule, model it into a clean warehouse, guard it with data quality checks, document it so analysts can self-serve, and ship it through CI/CD to a real running environment — not just a Jupyter notebook.
 
 ## 2. Why this project, and why this data
 
-Blue Bird is a transportation and logistics company, so a transit-domain project speaks directly to the role instead of being a generic "iris dataset" portfolio piece. Two data sources are combined:
+A transit-domain project speaks directly to the role instead of being a generic "iris dataset" portfolio piece. Two data sources are combined:
 
 1. **Real reference data** — Transjakarta's official GTFS feed (routes, stops, trips, calendars). Real, live, and updates periodically, which is exactly the kind of "slowly changing reference data" a DE pipeline needs to handle correctly.
 2. **Realistic fact data** — a public dataset of simulated tap-in/tap-out transactions, generated on top of the *real* route/stop structure. Not real ridership data, and the project says so everywhere it's shown (see §8).
@@ -60,7 +60,7 @@ flowchart LR
 6. A visitor opens the public embed page; the guest-token service mints them a short-lived Superset token; Superset renders the dashboard straight from the production Postgres.
 7. Every push to `main` runs CI (lint, pytest, `dbt test` against an ephemeral container). CD then redeploys only the **serving-layer code** (Superset config, guest-token service) to the VPS via Coolify's API. Pushing new *data* to production stays a deliberate, manual step (§4.4) — not something every git push triggers.
 
-## 5. How this maps to the Blue Bird job description
+## 5. How this maps to the job description
 
 | JD requirement | Where it lives in KoridorTJ |
 |---|---|
