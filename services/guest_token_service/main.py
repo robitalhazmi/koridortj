@@ -24,7 +24,7 @@ load_dotenv()
 app = FastAPI(
     title="KoridorTJ Transit Analytics & Guest Token API",
     description="Backend API for guest token minting, live transit telemetry, and embedded dashboard support.",
-    version="1.0.0",
+    version="1.0.1",
 )
 
 # Enable CORS for public frontend embedding
