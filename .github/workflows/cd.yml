@@ -6,8 +6,6 @@ on:
     branches: [main]
     types:
       - completed
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +16,7 @@ jobs:
   build-and-push-images:
     name: Build & Push GHCR Container Images
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -123,13 +121,20 @@ jobs:
         run: |
           if [ -n "$COOLIFY_WEBHOOK_URL" ]; then
             echo "Triggering deployment via Coolify Webhook..."
-            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$COOLIFY_WEBHOOK_URL")
+            # Try POST first, fallback to GET if not 2xx
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$COOLIFY_WEBHOOK_URL" 2>/dev/null)
             HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 400 ]; then
+              echo "POST returned $HTTP_CODE, trying GET..."
+              RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$COOLIFY_WEBHOOK_URL" 2>/dev/null)
+              HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            fi
             echo "Webhook response status: $HTTP_CODE"
-            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
               echo "✅ Deployment triggered successfully on Coolify VPS via Webhook!"
             else
-              echo "⚠️ Warning: Coolify webhook returned status $HTTP_CODE"
+              echo "⚠️ Warning: Coolify webhook returned status $HTTP_CODE. Check your COOLIFY_WEBHOOK_URL."
+              exit 1
             fi
           elif [ -n "$COOLIFY_API_TOKEN" ] && [ -n "$COOLIFY_RESOURCE_UUID" ]; then
             COOLIFY_URL="${COOLIFY_FQDN:-https://app.coolify.io}"

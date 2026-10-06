@@ -83,6 +83,25 @@ SUPERSET_DASHBOARD_ID=45d44fda-4e9c-4a88-894d-819f66fbfd33
 - **dbt Docs Static Catalog**:
   - Assign domain: `https://dbtdocs.yourdomain.com` -> routes to static file server or docs container.
 
+### Step 5: Configure Automated Deployments on Push to `main`
+To enable continuous zero-downtime deployments on the VPS whenever you push changes to `main`:
+
+1. **Option A: GitHub Actions Webhook Deploy (Recommended — Quality Gated)**:
+   - In Coolify, navigate to your Application (`docker-compose.prod.yml` resource) -> **Webhooks**.
+   - Copy the **Deploy Webhook** URL (e.g., `http://<vps-ip>:8000/api/v1/deploy?uuid=...` or `https://<coolify-domain>/webhooks/...`).
+   - In your GitHub Repository, navigate to **Settings** -> **Secrets and variables** -> **Actions**.
+   - Click **New repository secret** and add:
+     - Name: `COOLIFY_WEBHOOK_URL`
+     - Value: *(paste the Deploy Webhook URL from Coolify)*
+   - **How it works**:
+     - When you push to `main`, GitHub Actions first runs the full **CI test suite** (Ruff linter, SQLFluff, Pytest, and 80 ephemeral dbt tests).
+     - Upon CI success, GitHub Actions automatically builds updated serving-layer container images and hits `COOLIFY_WEBHOOK_URL` to trigger redeployment on your VPS.
+
+2. **Option B: Coolify Direct Git Auto-Deploy**:
+   - In Coolify, under the Application's **General** settings, toggle **Auto Deploy** to **Enabled**.
+   - Under **Webhooks**, copy the GitHub Webhook URL.
+   - In your GitHub repository **Settings** -> **Webhooks**, add the URL as a `push` event webhook.
+
 ---
 
 ## 3. Local Development & Promotion Workflow
