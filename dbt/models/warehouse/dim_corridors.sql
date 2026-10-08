@@ -1,9 +1,15 @@
-with corridors_from_taps as (
+with all_taps as (
+    select corridor_code, corridor_name, direction from {{ ref('stg_taps') }}
+    union all
+    select corridor_code, corridor_name, direction from {{ ref('stg_streaming_taps') }}
+),
+
+corridors_from_taps as (
     select
         corridor_code,
         coalesce(nullif(max(corridor_name), ''), corridor_code) as corridor_name,
         min(direction) as direction
-    from {{ ref('stg_taps') }}
+    from all_taps
     where corridor_code is not null and corridor_code != ''
     group by corridor_code
 ),

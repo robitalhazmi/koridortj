@@ -41,7 +41,17 @@ PROD_PG_DB="${PROD_POSTGRES_DB_WAREHOUSE:-warehouse}"
 PROD_SSH_HOST="${PROD_SSH_HOST:-}"
 PROD_SSH_USER="${PROD_SSH_USER:-root}"
 PROD_SSH_PORT="${PROD_SSH_PORT:-22}"
-PROD_SSH_KEY="${PROD_SSH_KEY_PATH:-~/.ssh/id_rsa}"
+
+# Resolve SSH Key Path with tilde expansion and auto-detection
+RAW_SSH_KEY="${PROD_SSH_KEY_PATH:-}"
+PROD_SSH_KEY="${RAW_SSH_KEY/#\~/$HOME}"
+if [[ -z "${PROD_SSH_KEY}" || ! -f "${PROD_SSH_KEY}" ]]; then
+    if [[ -f "${HOME}/.ssh/id_ed25519" ]]; then
+        PROD_SSH_KEY="${HOME}/.ssh/id_ed25519"
+    elif [[ -f "${HOME}/.ssh/id_rsa" ]]; then
+        PROD_SSH_KEY="${HOME}/.ssh/id_rsa"
+    fi
+fi
 
 echo "======================================================================"
 echo " Starting KoridorTJ Promotion Pipeline (Dev -> Production)"
@@ -127,13 +137,18 @@ if [[ -z "${PROD_SSH_HOST}" ]]; then
     echo "⚠️  PROD_SSH_HOST not configured in .env."
     echo "    Skipping live remote promotion. Staged dump file ready at: ${DUMP_FILE}"
 else
-    SSH_OPTS=()
-    if [[ -f "${PROD_SSH_KEY}" ]]; then
+    SSH_OPTS=(-o "StrictHostKeyChecking=accept-new")
+    if [[ -n "${PROD_SSH_KEY}" && -f "${PROD_SSH_KEY}" ]]; then
         SSH_OPTS+=("-i" "${PROD_SSH_KEY}")
     fi
 
+    SSH_EXEC=(ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}")
+    if [[ -n "${PROD_SSH_PASSWORD:-}" ]] && command -v sshpass >/dev/null 2>&1; then
+        SSH_EXEC=(sshpass -p "${PROD_SSH_PASSWORD}" ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}")
+    fi
+
     echo "Streaming ${DUMP_FILE} directly to VPS (${PROD_SSH_USER}@${PROD_SSH_HOST}:${PROD_SSH_PORT})..."
-    ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" "
+    "${SSH_EXEC[@]}" "
         set -euo pipefail
         PG_CONTAINER=\$(docker ps --format '{{.Names}} {{.Image}}' | grep -iE 'postgres' | awk '{print \$1}' | head -n 1)
         if [ -z \"\${PG_CONTAINER}\" ]; then
@@ -205,7 +220,7 @@ fi
 # Publish static documentation to VPS token-service container if SSH configured
 if [[ -n "${PROD_SSH_HOST}" && -d "${WEB_DOCS_DIR}" && -f "${WEB_DOCS_DIR}/index.html" ]]; then
     echo "Publishing dbt docs to production token-service container on VPS..."
-    tar -C "${WEB_DOCS_DIR}" -czf - . | ssh "${SSH_OPTS[@]}" -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" "
+    tar -C "${WEB_DOCS_DIR}" -czf - . | "${SSH_EXEC[@]}" "
         set -euo pipefail
         TOKEN_CONTAINER=\$(docker ps --format '{{.Names}} {{.Image}}' | grep -iE 'token-service' | awk '{print \$1}' | head -n 1)
         if [ -n \"\${TOKEN_CONTAINER}\" ]; then

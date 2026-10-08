@@ -12,20 +12,26 @@ with gtfs_stops as (
     from {{ ref('stg_stops') }}
 ),
 
+all_taps as (
+    select stop_id, stop_name, latitude, longitude, _ingested_at from {{ ref('stg_taps') }}
+    union all
+    select stop_id, stop_name, latitude, longitude, _ingested_at from {{ ref('stg_streaming_taps') }}
+),
+
 tap_stops as (
     select
         stop_id,
         stop_id as stop_code,
-        stop_name,
+        coalesce(nullif(max(stop_name), ''), stop_id) as stop_name,
         'Simulated Stop' as stop_desc,
         avg(latitude) as latitude,
         avg(longitude) as longitude,
         0 as location_type,
         0 as wheelchair_boarding,
         min(_ingested_at) as _ingested_at
-    from {{ ref('stg_taps') }}
+    from all_taps
     where stop_id not in (select gtfs_stops.stop_id from gtfs_stops)
-    group by stop_id, stop_name
+    group by stop_id
 ),
 
 unioned as (

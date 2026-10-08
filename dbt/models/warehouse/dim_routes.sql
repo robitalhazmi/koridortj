@@ -13,6 +13,12 @@ with gtfs_routes as (
     from {{ ref('stg_routes') }}
 ),
 
+all_taps as (
+    select route_id, corridor_name, corridor_code, _ingested_at from {{ ref('stg_taps') }}
+    union all
+    select route_id, corridor_name, corridor_code, _ingested_at from {{ ref('stg_streaming_taps') }}
+),
+
 tap_routes as (
     select
         route_id,
@@ -25,7 +31,7 @@ tap_routes as (
         '#FFFFFF' as route_text_color,
         max(corridor_code) as corridor_code,
         min(_ingested_at) as _ingested_at
-    from {{ ref('stg_taps') }}
+    from all_taps
     where route_id not in (select gtfs_routes.route_id from gtfs_routes)
     group by route_id
 ),
