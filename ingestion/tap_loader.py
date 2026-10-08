@@ -6,6 +6,7 @@ using Pydantic, and loads raw records into PostgreSQL table `raw.taps` with audi
 and explicit `is_simulated = TRUE` flagging.
 """
 
+import argparse
 import csv
 import logging
 import os
@@ -81,27 +82,41 @@ class TapLoader:
 
     def get_connection(self) -> psycopg2.extensions.connection:
         """Establish connection to the target PostgreSQL database."""
-        logger.info(
-            "Connecting to PostgreSQL at %s:%s/%s as %s",
-            self.db_host,
-            self.db_port,
-            self.db_name,
-            self.db_user,
-        )
-        try:
-            conn = psycopg2.connect(
-                host=self.db_host,
-                port=self.db_port,
-                dbname=self.db_name,
-                user=self.db_user,
-                password=self.db_password,
-                connect_timeout=10,
+        hosts_to_try = [self.db_host]
+        if self.db_host == "postgres" and "localhost" not in hosts_to_try:
+            hosts_to_try.append("localhost")
+
+        last_exc = None
+        for host in hosts_to_try:
+            logger.info(
+                "Connecting to PostgreSQL at %s:%s/%s as %s",
+                host,
+                self.db_port,
+                self.db_name,
+                self.db_user,
             )
-            conn.autocommit = False
-            return conn
-        except Exception as exc:
-            logger.error("Failed to connect to PostgreSQL database: %s", exc)
-            raise TapLoaderError(f"Database connection failed: {exc}") from exc
+            try:
+                conn = psycopg2.connect(
+                    host=host,
+                    port=self.db_port,
+                    dbname=self.db_name,
+                    user=self.db_user,
+                    password=self.db_password,
+                    connect_timeout=10,
+                )
+                conn.autocommit = False
+                return conn
+            except Exception as exc:
+                last_exc = exc
+                if len(hosts_to_try) > 1 and host == "postgres":
+                    logger.warning(
+                        "Could not connect to host 'postgres' (%s); attempting fallback to 'localhost'...",
+                        exc,
+                    )
+                    continue
+
+        logger.error("Failed to connect to PostgreSQL database: %s", last_exc)
+        raise TapLoaderError(f"Database connection failed: {last_exc}") from last_exc
 
     def ensure_dataset_available(self) -> str:
         """Download and cache the dataset CSV if not already present."""
@@ -323,10 +338,59 @@ class TapLoader:
 
 def main():
     """CLI entrypoint."""
-    csv_path = sys.argv[1] if len(sys.argv) > 1 else None
+    parser = argparse.ArgumentParser(description="KoridorTJ Historical Tap Transaction Ingestion")
+    parser.add_argument(
+        "--csv-path",
+        "-f",
+        dest="csv_path",
+        default=None,
+        help="Path to the source TransJakarta tap CSV dataset",
+    )
+    parser.add_argument(
+        "--db-host",
+        default=None,
+        help="PostgreSQL host (defaults to POSTGRES_HOST or localhost)",
+    )
+    parser.add_argument(
+        "--db-port",
+        type=int,
+        default=None,
+        help="PostgreSQL port (defaults to POSTGRES_PORT or 5432)",
+    )
+    parser.add_argument(
+        "--db-name",
+        default=None,
+        help="PostgreSQL database name (defaults to POSTGRES_DB_WAREHOUSE or warehouse)",
+    )
+    parser.add_argument(
+        "--db-user",
+        default=None,
+        help="PostgreSQL user (defaults to POSTGRES_INGESTION_USER or postgres)",
+    )
+    parser.add_argument(
+        "--db-password",
+        default=None,
+        help="PostgreSQL password",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5000,
+        help="Batch size for bulk insertion (default: 5000)",
+    )
+
+    args = parser.parse_args()
+
     try:
-        loader = TapLoader()
-        loader.run(csv_file_path=csv_path)
+        loader = TapLoader(
+            db_host=args.db_host,
+            db_port=args.db_port,
+            db_name=args.db_name,
+            db_user=args.db_user,
+            db_password=args.db_password,
+            cache_path=args.csv_path,
+        )
+        loader.run(csv_file_path=args.csv_path, batch_size=args.batch_size)
     except Exception as e:
         logger.critical("Tap data ingestion failed: %s", e, exc_info=True)
         sys.exit(1)
