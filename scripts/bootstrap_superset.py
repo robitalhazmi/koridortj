@@ -473,6 +473,8 @@ class SupersetProvisioner:
                         "latCol": "latitude",
                         "lonCol": "longitude",
                     },
+                    "groupby": ["stop_name", "stop_id"],
+                    "js_columns": ["stop_name", "stop_id"],
                     "row_limit": 10000,
                     "mapbox_style": "mapbox://styles/mapbox/streets-v9",
                     "viewport": {
@@ -482,7 +484,7 @@ class SupersetProvisioner:
                         "bearing": 0,
                         "pitch": 0,
                     },
-                    "point_radius_fixed": {"type": "fix", "value": 25},
+                    "point_radius_fixed": {"type": "fix", "value": 30},
                     "point_unit": "square_meters",
                     "min_radius": 2,
                     "max_radius": 250,
