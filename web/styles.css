@@ -329,11 +329,11 @@ body {
 /* Embed Box */
 .embed-box {
   width: 100%;
-  min-height: 850px;
-  height: 85vh;
+  min-height: 1600px;
+  height: 1600px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: #ffffff;
   position: relative;
 }
@@ -341,8 +341,8 @@ body {
 .embed-box iframe,
 #dashboard-embed-container iframe {
   width: 100% !important;
-  height: 100% !important;
-  min-height: 850px !important;
+  height: 1600px !important;
+  min-height: 1600px !important;
   border: none !important;
   display: block !important;
 }

@@ -219,9 +219,9 @@ async function loadEmbeddedDashboard(force = false) {
         <iframe
           src="${tokenData.superset_domain}/embedded/${tokenData.dashboard_id}?uiConfig=6"
           width="100%"
-          height="850px"
+          height="1600px"
           frameborder="0"
-          style="border: none; border-radius: 8px; width: 100%; min-height: 850px; height: 85vh;">
+          style="border: none; border-radius: 8px; width: 100%; min-height: 1600px; height: 1600px;">
         </iframe>
       `;
       isDashboardLoaded = true;
