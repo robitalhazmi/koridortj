@@ -186,15 +186,21 @@ def get_live_stats():
             """)
             by_bank = [dict(r) for r in cur.fetchall()]
 
-            # Hourly distribution
+            # Hourly distribution (guarantees continuous 24-hour series 0..23 with 0 for quiet hours)
             cur.execute("""
                 SELECT
-                    extract(hour from tap_timestamp)::int as hour_of_day,
-                    count(*) as tap_count
-                FROM warehouse.fact_taps
-                WHERE tap_type = 'IN'
-                GROUP BY hour_of_day
-                ORDER BY hour_of_day;
+                    h.hour_of_day,
+                    coalesce(t.tap_count, 0) as tap_count
+                FROM generate_series(0, 23) AS h(hour_of_day)
+                LEFT JOIN (
+                    SELECT
+                        extract(hour from tap_timestamp)::int as hour_of_day,
+                        count(*) as tap_count
+                    FROM warehouse.fact_taps
+                    WHERE tap_type = 'IN'
+                    GROUP BY hour_of_day
+                ) t USING (hour_of_day)
+                ORDER BY h.hour_of_day;
             """)
             hourly = [dict(r) for r in cur.fetchall()]
 

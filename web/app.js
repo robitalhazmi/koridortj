@@ -47,8 +47,15 @@ function renderKPIs(kpis) {
 
 function renderHourlyChart(hourlyData) {
   const ctx = document.getElementById('hourlyChart').getContext('2d');
-  const labels = hourlyData.map(d => `${String(d.hour_of_day).padStart(2, '0')}:00`);
-  const values = hourlyData.map(d => d.tap_count);
+  
+  // Guarantee full continuous 24-hour timeline (00:00 to 23:00) so no hours are skipped
+  const hourMap = new Map((hourlyData || []).map(d => [Number(d.hour_of_day), Number(d.tap_count)]));
+  const labels = [];
+  const values = [];
+  for (let i = 0; i < 24; i++) {
+    labels.push(`${String(i).padStart(2, '0')}:00`);
+    values.push(hourMap.get(i) || 0);
+  }
 
   if (hourlyChartInstance) hourlyChartInstance.destroy();
 
