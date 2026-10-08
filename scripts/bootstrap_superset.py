@@ -473,8 +473,6 @@ class SupersetProvisioner:
                         "latCol": "latitude",
                         "lonCol": "longitude",
                     },
-                    "groupby": ["stop_name", "stop_id"],
-                    "js_columns": ["stop_name", "stop_id"],
                     "row_limit": 10000,
                     "mapbox_style": "mapbox://styles/mapbox/streets-v9",
                     "viewport": {
@@ -484,12 +482,32 @@ class SupersetProvisioner:
                         "bearing": 0,
                         "pitch": 0,
                     },
-                    "point_radius_fixed": {"type": "fix", "value": 30},
+                    "point_radius_fixed": {"type": "fix", "value": 25},
                     "point_unit": "square_meters",
                     "min_radius": 2,
                     "max_radius": 250,
                     "color_picker": {"r": 0, "g": 86, "b": 150, "a": 1},
-                    "tooltip": "<b>Stop Name:</b> {stop_name}<br><b>Stop ID:</b> {stop_id}",
+                    "groupby": ["stop_name", "stop_id"],
+                    "js_data_mutator": """function(data) {
+    return data.map(d => ({
+        ...d,
+        stop_name: d.stop_name || 'TransJakarta Shelter',
+        stop_id: d.stop_id || 'N/A',
+        display_label: `${d.stop_name} (${d.stop_id})`,
+    }));
+}""",
+                    "js_tooltip": """function(object) {
+    if (!object) return '';
+    const name = object.stop_name || (object.extraProps && object.extraProps.stop_name) || 'Transit Stop';
+    const id = object.stop_id || (object.extraProps && object.extraProps.stop_id) || 'N/A';
+    const lat = object.latitude || (object.position ? object.position[1].toFixed(5) : '');
+    const lon = object.longitude || (object.position ? object.position[0].toFixed(5) : '');
+    return '<div style=\"background:#0f172a;color:#fff;padding:8px 12px;border-radius:6px;font-family:sans-serif;\">' +
+           '<div style=\"font-weight:700;color:#38bdf8;font-size:13px;margin-bottom:3px;\">🚏 ' + name + '</div>' +
+           '<div style=\"font-size:11px;color:#94a3b8;\"><b>Stop ID:</b> ' + id + '</div>' +
+           '<div style=\"font-size:10px;color:#64748b;margin-top:2px;\">📍 ' + lat + ', ' + lon + '</div>' +
+           '</div>';
+}""",
                 },
                 dash_id=dash_id,
             )
