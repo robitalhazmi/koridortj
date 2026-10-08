@@ -444,7 +444,7 @@ class SupersetProvisioner:
             if c3:
                 chart_ids.append(c3)
 
-            # Chart 4: Weekday vs Weekend Pattern
+            # Chart 4: Ridership by Direction and Corridor
             c4 = self.create_chart(
                 dataset_id=fact_ds_id,
                 slice_name="Ridership by Direction and Corridor",
@@ -459,6 +459,40 @@ class SupersetProvisioner:
             )
             if c4:
                 chart_ids.append(c4)
+
+        if stops_ds_id:
+            # Chart 5: Geospatial Transit Stop Network Map (deck.gl Scatterplot)
+            c5 = self.create_chart(
+                dataset_id=stops_ds_id,
+                slice_name="TransJakarta Stop Network Map",
+                viz_type="deck_scatter",
+                params={
+                    "datasource": f"{stops_ds_id}__table",
+                    "spatial": {
+                        "type": "latlong",
+                        "latCol": "latitude",
+                        "lonCol": "longitude",
+                    },
+                    "row_limit": 10000,
+                    "mapbox_style": "mapbox://styles/mapbox/streets-v9",
+                    "viewport": {
+                        "longitude": 106.82715,
+                        "latitude": -6.17539,
+                        "zoom": 11,
+                        "bearing": 0,
+                        "pitch": 0,
+                    },
+                    "point_radius_fixed": {"type": "fix", "value": 25},
+                    "point_unit": "square_meters",
+                    "min_radius": 2,
+                    "max_radius": 250,
+                    "color_picker": {"r": 0, "g": 86, "b": 150, "a": 1},
+                    "tooltip": "<b>Stop Name:</b> {stop_name}<br><b>Stop ID:</b> {stop_id}",
+                },
+                dash_id=dash_id,
+            )
+            if c5:
+                chart_ids.append(c5)
 
         summary = {
             "status": "SUCCESS",

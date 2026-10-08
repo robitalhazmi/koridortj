@@ -3,6 +3,7 @@ import urllib.parse
 
 ROW_LIMIT = 50000
 SECRET_KEY = os.getenv("SUPERSET_SECRET_KEY", "koridortj_superset_secret_key_9876543210abcdef")
+MAPBOX_API_KEY = os.getenv("MAPBOX_API_KEY", "")
 
 # Superset metadata database
 POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
