@@ -17,7 +17,8 @@ with batch_taps as (
         stop_sequence,
         pay_amount,
         is_simulated,
-        _ingested_at
+        _ingested_at,
+        1 as priority
     from {{ ref('stg_taps') }}
 ),
 
@@ -40,7 +41,8 @@ streaming_taps as (
         stop_sequence,
         pay_amount,
         is_simulated,
-        _ingested_at
+        _ingested_at,
+        2 as priority
     from {{ ref('stg_streaming_taps') }}
 ),
 
@@ -71,7 +73,7 @@ deduped as (
         is_simulated,
         _ingested_at
     from unioned
-    order by tap_id asc, _ingested_at desc
+    order by tap_id asc, priority asc, _ingested_at desc
 )
 
 select * from deduped
