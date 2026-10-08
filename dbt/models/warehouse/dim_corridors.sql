@@ -1,7 +1,15 @@
 with all_taps as (
-    select corridor_code, corridor_name, direction from {{ ref('stg_taps') }}
+    select
+        corridor_code,
+        corridor_name,
+        direction
+    from {{ ref('stg_taps') }}
     union all
-    select corridor_code, corridor_name, direction from {{ ref('stg_streaming_taps') }}
+    select
+        corridor_code,
+        corridor_name,
+        direction
+    from {{ ref('stg_streaming_taps') }}
 ),
 
 corridors_from_taps as (

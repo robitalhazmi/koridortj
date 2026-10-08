@@ -14,9 +14,19 @@ with gtfs_routes as (
 ),
 
 all_taps as (
-    select route_id, corridor_name, corridor_code, _ingested_at from {{ ref('stg_taps') }}
+    select
+        route_id,
+        corridor_name,
+        corridor_code,
+        _ingested_at
+    from {{ ref('stg_taps') }}
     union all
-    select route_id, corridor_name, corridor_code, _ingested_at from {{ ref('stg_streaming_taps') }}
+    select
+        route_id,
+        corridor_name,
+        corridor_code,
+        _ingested_at
+    from {{ ref('stg_streaming_taps') }}
 ),
 
 tap_routes as (

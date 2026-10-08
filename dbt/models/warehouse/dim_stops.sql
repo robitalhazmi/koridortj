@@ -13,9 +13,21 @@ with gtfs_stops as (
 ),
 
 all_taps as (
-    select stop_id, stop_name, latitude, longitude, _ingested_at from {{ ref('stg_taps') }}
+    select
+        stop_id,
+        stop_name,
+        latitude,
+        longitude,
+        _ingested_at
+    from {{ ref('stg_taps') }}
     union all
-    select stop_id, stop_name, latitude, longitude, _ingested_at from {{ ref('stg_streaming_taps') }}
+    select
+        stop_id,
+        stop_name,
+        latitude,
+        longitude,
+        _ingested_at
+    from {{ ref('stg_streaming_taps') }}
 ),
 
 tap_stops as (
